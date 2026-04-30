@@ -1,0 +1,23 @@
+# Override for production deploy on an Ubuntu host that already has
+# EasyEngine v4 running. EE's global nginx-proxy + acme-companion auto-route
+# any container on the `ee-global-frontend-network` that has VIRTUAL_HOST set,
+# and issue a Let's Encrypt certificate for LETSENCRYPT_HOST.
+#
+# Run together with the base file:
+#   docker compose -f docker-compose.yml -f docker-compose.ee.yml up -d --build
+version: "3.8"
+
+services:
+  panel:
+    environment:
+      VIRTUAL_HOST: site.pelxa.com
+      VIRTUAL_PORT: "3000"
+      LETSENCRYPT_HOST: site.pelxa.com
+      LETSENCRYPT_EMAIL: team.product@zafago.net
+    networks:
+      - default
+      - ee-global-frontend-network
+
+networks:
+  ee-global-frontend-network:
+    external: true
