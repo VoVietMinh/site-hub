@@ -17,7 +17,7 @@
 const { spawn } = require('child_process');
 const logRepo = require('../modules/logs/log.repository');
 
-const ALLOWED_BINARIES = new Set(['ee', 'wp', 'docker']);
+const ALLOWED_BINARIES = new Set(['ee', 'wp', 'docker', 'ssh']);
 
 // One token = letters / digits / common shell-safe punctuation. We deliberately
 // reject backticks, $, ;, &, |, >, <, (, ), {, }, *, ?, etc.

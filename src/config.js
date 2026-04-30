@@ -40,7 +40,13 @@ const config = {
   },
 
   easyEngine: {
-    binary: process.env.EE_BINARY || 'ee'
+    binary: process.env.EE_BINARY || 'ee',
+    ssh: {
+      enabled: String(process.env.EE_OVER_SSH || 'false').toLowerCase() === 'true',
+      host: process.env.EE_SSH_HOST || 'host.docker.internal',
+      user: process.env.EE_SSH_USER || 'root',
+      keyPath: process.env.EE_SSH_KEY_PATH || '/app/secrets/ee_key'
+    }
   },
 
   n8n: {

@@ -13,21 +13,13 @@ FROM node:20-bookworm-slim
 ENV NODE_ENV=production \
     PORT=3000
 
-# Install minimal tooling: docker CLI (so `ee` can talk to host docker via the
-# mounted socket), build tools for better-sqlite3, and CA bundles.
+# Install only: SSH client (so the panel can run `ee` on the host over SSH),
+# build tools for better-sqlite3, and CA bundles.
+# EasyEngine itself stays on the host — the container never runs the ee
+# binary or any PHP runtime locally.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-        ca-certificates curl gnupg python3 make g++ \
- && install -m 0755 -d /etc/apt/keyrings \
- && curl -fsSL https://download.docker.com/linux/debian/gpg \
-        | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
- && chmod a+r /etc/apt/keyrings/docker.gpg \
- && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-         https://download.docker.com/linux/debian bookworm stable" \
-        > /etc/apt/sources.list.d/docker.list \
- && apt-get update \
- && apt-get install -y --no-install-recommends docker-ce-cli \
- && apt-get purge -y curl gnupg \
+        ca-certificates openssh-client python3 make g++ \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

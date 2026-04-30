@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   panel:
     build: .
@@ -10,12 +8,15 @@ services:
       - "3000:3000"
     env_file:
       - .env
+    # Lets the container resolve the host as `host.docker.internal` so the
+    # SSH bridge to EasyEngine has a stable target on Linux.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       # SQLite + log persistence
       - ./data:/app/data
       - ./logs:/app/logs
-      # Bind-mount the host EasyEngine binary + docker socket so the panel can
-      # actually run `ee site list / create / delete` against the host.
-      - /usr/local/bin/ee:/usr/local/bin/ee:ro
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /opt/easyengine:/opt/easyengine
+      # SSH key the container uses to run `ee` on the host. Path mode 0600 is
+      # required by the OpenSSH client; we set it explicitly via `:ro` mount
+      # plus `chmod 600` on the host side (see README §3).
+      - ./secrets/ee_key:/app/secrets/ee_key:ro

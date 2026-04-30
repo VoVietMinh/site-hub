@@ -5,29 +5,21 @@
  *
  * EasyEngine ships a wrapper:  `ee shell <domain> --command="wp ..."`
  *
- * That makes every WP-CLI invocation a two-binary call:
- *      ee shell <domain> --command="..."
+ * Every WP-CLI invocation routes through `eeBridge`, which prefixes the call
+ * with `ssh user@host` when EE_OVER_SSH=true (production on Ubuntu) or runs
+ * `ee` locally otherwise (dev). The container itself never executes EE or
+ * PHP — that all happens on the host.
  *
- * To keep our hardened command runner safe we:
- *   • only ever pass `ee` as the binary
- *   • build the inner wp command as a single argv array, then JSON-stringify
- *     and base64-encode it to ship it through `--command=` without ever
- *     touching shell metacharacters in the outer call
- *
- * In environments where `ee shell` isn't available, set EE_USE_DOCKER_EXEC=1
- * and we'll fall back to `docker exec` against the site's php container.
+ * Safety: the inner wp argv is shell-quoted with single quotes (escaping
+ * embedded single quotes the POSIX way) so the shell that EE spawns inside
+ * the site's php container can't be tricked by user input.
  */
 
-const { run, runOrThrow } = require('./commandRunner');
-const config = require('../config');
+const { runEE: run, runEEOrThrow: runOrThrow } = require('./eeBridge');
 const v = require('../utils/validators');
 
-const EE = config.easyEngine.binary;
-
 /**
- * Build a wp-cli argv as a single shell-safe string. We single-quote every
- * argument and escape embedded single quotes — even though we know
- * ee-shell launches a shell internally, we never embed user input directly.
+ * Build a wp-cli argv as a single shell-safe string.
  */
 function shellQuote(arg) {
   if (/^[A-Za-z0-9_./:=,\-]+$/.test(arg)) return arg;
@@ -50,23 +42,16 @@ async function wp(domain, wpArgv, opts = {}) {
   }
   const command = buildWpCommand(wpArgv);
   return runOrThrow(
-    EE,
     ['shell', domain, `--command=${command}`],
     { category: 'wp-cli', timeoutMs: opts.timeoutMs || 10 * 60 * 1000 }
   );
 }
 
-/**
- * Site-wide options.
- */
 async function setSiteOptions(domain, { title, description }) {
   if (title) await wp(domain, ['option', 'update', 'blogname', title]);
   if (description) await wp(domain, ['option', 'update', 'blogdescription', description]);
 }
 
-/**
- * Theme + plugins.
- */
 async function installTheme(domain, slug, { activate = true } = {}) {
   const args = ['theme', 'install', slug];
   if (activate) args.push('--activate');
@@ -80,17 +65,10 @@ async function installPlugins(domain, slugs, { activate = true } = {}) {
   await wp(domain, args);
 }
 
-/**
- * Categories + pages + menu.
- */
 async function ensureCategory(domain, name) {
-  // wp term create taxonomy <term> — succeeds if missing, fails if dup.
-  // We don't want a duplicate-term error to abort the whole site setup, so
-  // run it and swallow non-zero exits.
-  const r = await run(EE, [
-    'shell', domain,
-    `--command=${buildWpCommand(['term', 'create', 'category', name, '--porcelain'])}`
-  ], { category: 'wp-cli' });
+  // Don't fail the whole pipeline if the term already exists.
+  const command = buildWpCommand(['term', 'create', 'category', name, '--porcelain']);
+  const r = await run(['shell', domain, `--command=${command}`], { category: 'wp-cli' });
   return r.stdout.trim();
 }
 
@@ -107,7 +85,6 @@ async function createPage(domain, { title, content = '', status = 'publish' }) {
 }
 
 async function createMenu(domain, name) {
-  // wp menu create returns the term id with --porcelain
   const r = await wp(domain, ['menu', 'create', name, '--porcelain']);
   return parseInt(r.stdout.trim(), 10);
 }
@@ -133,15 +110,11 @@ async function getSiteUrl(domain) {
   return r.stdout.trim();
 }
 
-async function getAdminPassword(domain, user = 'admin') {
-  // best-effort — used to surface info in the UI after creation
-  const r = await run(EE, ['site', 'info', domain], { category: 'easyengine' });
+async function getAdminPassword(domain) {
+  const r = await run(['site', 'info', domain], { category: 'easyengine' });
   return r.stdout;
 }
 
-/**
- * Full WP onboarding pipeline used after `ee site create`.
- */
 async function configureNewSite(domain, opts = {}) {
   const {
     title,
@@ -181,7 +154,7 @@ async function configureNewSite(domain, opts = {}) {
   }
   await assignMenuToLocation(domain, menuId, 'primary');
 
-  await flushCache(domain).catch(() => {}); // not fatal
+  await flushCache(domain).catch(() => {});
   await flushRewrite(domain);
 
   return { theme, plugins, pageIds, menuId };

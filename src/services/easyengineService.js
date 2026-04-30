@@ -11,11 +11,8 @@
  *   ee site delete <domain> --yes
  */
 
-const { run, runOrThrow } = require('./commandRunner');
-const config = require('../config');
+const { runEE: run, runEEOrThrow: runOrThrow } = require('./eeBridge');
 const v = require('../utils/validators');
-
-const EE = config.easyEngine.binary;
 
 function tryParseJson(s) {
   try { return JSON.parse(s); } catch (_) { return null; }
@@ -36,13 +33,13 @@ function parsePlainList(stdout) {
 }
 
 async function listSites() {
-  const r = await run(EE, ['site', 'list', '--format=json'], { category: 'easyengine' });
+  const r = await run(['site', 'list', '--format=json'], { category: 'easyengine' });
   if (r.code === 0) {
     const json = tryParseJson(r.stdout);
     if (Array.isArray(json)) return json;
   }
   // Fallback for older EE
-  const r2 = await run(EE, ['site', 'list'], { category: 'easyengine' });
+  const r2 = await run(['site', 'list'], { category: 'easyengine' });
   if (r2.code !== 0) {
     return [];
   }
@@ -51,7 +48,7 @@ async function listSites() {
 
 async function siteInfo(domain) {
   v.assertDomain(domain);
-  const r = await run(EE, ['site', 'info', domain, '--format=json'], {
+  const r = await run(['site', 'info', domain, '--format=json'], {
     category: 'easyengine'
   });
   if (r.code === 0) {
@@ -59,7 +56,7 @@ async function siteInfo(domain) {
     if (json) return json;
     return { raw: r.stdout };
   }
-  const r2 = await runOrThrow(EE, ['site', 'info', domain], { category: 'easyengine' });
+  const r2 = await runOrThrow(['site', 'info', domain], { category: 'easyengine' });
   return { raw: r2.stdout };
 }
 
@@ -88,7 +85,7 @@ async function createSite(domain, options = {}) {
 
 async function deleteSite(domain) {
   v.assertDomain(domain);
-  return runOrThrow(EE, ['site', 'delete', domain, '--yes'], {
+  return runOrThrow(['site', 'delete', domain, '--yes'], {
     category: 'easyengine',
     timeoutMs: 10 * 60 * 1000
   });
