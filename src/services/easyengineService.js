@@ -80,7 +80,7 @@ async function createSite(domain, options = {}) {
   }
 
   // EE site create can take many minutes when pulling images for the first time.
-  return runOrThrow(EE, args, { category: 'easyengine', timeoutMs: 30 * 60 * 1000 });
+  return runOrThrow(args, { category: 'easyengine', timeoutMs: 30 * 60 * 1000 });
 }
 
 async function deleteSite(domain) {
