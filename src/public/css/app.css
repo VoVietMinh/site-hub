@@ -390,8 +390,58 @@ a:hover { color: var(--link-hover); text-decoration: underline; }
 .divider { height: 1px; background: var(--border); margin: 18px 0; }
 .muted { color: var(--text-muted); }
 
+/* Repeater rows for the site-template settings page ---------------------- */
+.repeater-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.repeater-row.repeater-kv {
+  grid-template-columns: 1fr 2fr auto;
+}
+.repeater-row input {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  font-size: 14px;
+  background: #fff;
+  color: var(--text);
+}
+.page-block {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fcfcfb;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+.page-block + .page-block { margin-top: 0; }
+.page-block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--border);
+}
+.page-block textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+  background: #fff;
+  color: var(--text);
+  resize: vertical;
+}
+
 @media (max-width: 880px) {
   .layout { grid-template-columns: 1fr; }
   .sidebar { position: static; height: auto; }
   .content { padding: 22px 16px 50px; }
+  .repeater-row.repeater-kv { grid-template-columns: 1fr; }
 }

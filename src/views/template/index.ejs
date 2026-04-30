@@ -5,21 +5,159 @@
   </div>
 </div>
 
-<div class="card">
-  <div class="card-header">
-    <h3>JSON</h3>
-    <span class="muted" style="font-size:12px;"><%= __('siteTemplate.filePath') %> <span class="code" style="display:inline-block;"><%= filePath %></span></span>
+<form method="post" action="/template" id="tpl-form">
+
+  <!-- ============== General ============== -->
+  <div class="card">
+    <div class="card-header"><h3><%= __('siteTemplate.general') %></h3></div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="form-row">
+          <label for="theme"><%= __('sites.theme') %></label>
+          <input id="theme" name="theme" type="text" required value="<%= tpl.theme || '' %>" />
+          <div class="help"><%= __('siteTemplate.themeHelp') %></div>
+        </div>
+        <div class="form-row">
+          <label for="menuName"><%= __('sites.menu') %></label>
+          <input id="menuName" name="menuName" type="text" required value="<%= tpl.menuName || '' %>" />
+          <div class="help"><%= __('siteTemplate.menuNameHelp') %></div>
+        </div>
+      </div>
+    </div>
   </div>
-  <div class="card-body">
-    <p class="muted" style="margin-top:0;"><%= __('siteTemplate.placeholders') %></p>
-    <form method="post" action="/template">
+
+  <!-- ============== Plugins ============== -->
+  <div class="card">
+    <div class="card-header">
+      <h3><%= __('siteTemplate.plugins') %></h3>
+      <button type="button" class="btn btn-sm" data-action="add-plugin">+ <%= __('siteTemplate.addPlugin') %></button>
+    </div>
+    <div class="card-body">
+      <p class="muted" style="margin-top:0;"><%= __('siteTemplate.pluginsHelp') %></p>
+      <div id="plugins-list">
+        <% (tpl.plugins || []).forEach(function(p, i) { %>
+          <div class="repeater-row" data-row>
+            <input name="plugins[]" type="text" value="<%= p %>" placeholder="<%= __('siteTemplate.pluginSlug') %>" />
+            <button type="button" class="btn btn-sm btn-danger" data-action="remove-row"><%= __('siteTemplate.remove') %></button>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============== WordPress options ============== -->
+  <div class="card">
+    <div class="card-header">
+      <h3><%= __('siteTemplate.options') %></h3>
+      <button type="button" class="btn btn-sm" data-action="add-option">+ <%= __('siteTemplate.addOption') %></button>
+    </div>
+    <div class="card-body">
+      <p class="muted" style="margin-top:0;"><%= __('siteTemplate.optionsHelp') %></p>
+      <div id="options-list">
+        <% Object.entries(tpl.options || {}).forEach(function([k, v]) { %>
+          <div class="repeater-row repeater-kv" data-row>
+            <input name="optionKeys[]"   type="text" value="<%= k %>" placeholder="<%= __('siteTemplate.optionKey') %>" />
+            <input name="optionValues[]" type="text" value="<%= v %>" placeholder="<%= __('siteTemplate.optionValue') %>" />
+            <button type="button" class="btn btn-sm btn-danger" data-action="remove-row"><%= __('siteTemplate.remove') %></button>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============== Pages ============== -->
+  <div class="card">
+    <div class="card-header">
+      <h3><%= __('siteTemplate.pages') %></h3>
+      <button type="button" class="btn btn-sm" data-action="add-page">+ <%= __('siteTemplate.addPage') %></button>
+    </div>
+    <div class="card-body">
+      <p class="muted" style="margin-top:0;">
+        <%= __('siteTemplate.pagesHelp') %>
+        <span class="code" style="display:inline-block; margin-left:6px;"><%= __('siteTemplate.placeholders') %></span>
+      </p>
+      <div id="pages-list">
+        <% (tpl.pages || []).forEach(function(page, i) { %>
+          <div class="page-block" data-row data-page-index="<%= i %>">
+            <div class="page-block-head">
+              <strong><%= __('siteTemplate.page') %> #<span data-page-num><%= i + 1 %></span></strong>
+              <button type="button" class="btn btn-sm btn-danger" data-action="remove-row"><%= __('siteTemplate.remove') %></button>
+            </div>
+            <div class="form-grid" style="grid-template-columns: repeat(3, 1fr);">
+              <div class="form-row">
+                <label><%= __('siteTemplate.pageSlug') %></label>
+                <input name="pages[<%= i %>][slug]" type="text" required value="<%= page.slug %>" />
+              </div>
+              <div class="form-row">
+                <label><%= __('siteTemplate.pageTitle') %></label>
+                <input name="pages[<%= i %>][title]" type="text" required value="<%= page.title %>" />
+              </div>
+              <div class="form-row">
+                <label><%= __('siteTemplate.pageMenuTitle') %></label>
+                <input name="pages[<%= i %>][menuTitle]" type="text" value="<%= page.menuTitle || '' %>" />
+              </div>
+            </div>
+            <div class="form-row">
+              <label><%= __('siteTemplate.pageContent') %></label>
+              <textarea name="pages[<%= i %>][content]" rows="6"><%= page.content %></textarea>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-actions" style="margin-top:18px;">
+    <button class="btn btn-primary" type="submit"><%= __('siteTemplate.saveTemplate') %></button>
+    <a href="/" class="btn"><%= __('common.cancel') %></a>
+    <span class="muted" style="margin-left:auto; font-size:12px;">
+      <%= __('siteTemplate.filePath') %>:
+      <span class="code" style="display:inline-block;"><%= filePath %></span>
+    </span>
+  </div>
+</form>
+
+<!-- ============== Hidden templates for cloning ============== -->
+<template id="tpl-plugin-row">
+  <div class="repeater-row" data-row>
+    <input name="plugins[]" type="text" placeholder="<%= __('siteTemplate.pluginSlug') %>" />
+    <button type="button" class="btn btn-sm btn-danger" data-action="remove-row"><%= __('siteTemplate.remove') %></button>
+  </div>
+</template>
+
+<template id="tpl-option-row">
+  <div class="repeater-row repeater-kv" data-row>
+    <input name="optionKeys[]"   type="text" placeholder="<%= __('siteTemplate.optionKey') %>" />
+    <input name="optionValues[]" type="text" placeholder="<%= __('siteTemplate.optionValue') %>" />
+    <button type="button" class="btn btn-sm btn-danger" data-action="remove-row"><%= __('siteTemplate.remove') %></button>
+  </div>
+</template>
+
+<template id="tpl-page-block">
+  <div class="page-block" data-row>
+    <div class="page-block-head">
+      <strong><%= __('siteTemplate.page') %> #<span data-page-num></span></strong>
+      <button type="button" class="btn btn-sm btn-danger" data-action="remove-row"><%= __('siteTemplate.remove') %></button>
+    </div>
+    <div class="form-grid" style="grid-template-columns: repeat(3, 1fr);">
       <div class="form-row">
-        <textarea name="json" rows="28" style="width:100%; font-family: ui-monospace, monospace; font-size: 12.5px; padding: 12px; border-radius: 6px; border: 1px solid var(--border-strong);"><%= json %></textarea>
+        <label><%= __('siteTemplate.pageSlug') %></label>
+        <input data-name="slug" type="text" required />
       </div>
-      <div class="form-actions">
-        <button type="submit" class="btn btn-primary"><%= __('common.save') %></button>
-        <a href="/template" class="btn"><%= __('common.cancel') %></a>
+      <div class="form-row">
+        <label><%= __('siteTemplate.pageTitle') %></label>
+        <input data-name="title" type="text" required />
       </div>
-    </form>
+      <div class="form-row">
+        <label><%= __('siteTemplate.pageMenuTitle') %></label>
+        <input data-name="menuTitle" type="text" />
+      </div>
+    </div>
+    <div class="form-row">
+      <label><%= __('siteTemplate.pageContent') %></label>
+      <textarea data-name="content" rows="6"></textarea>
+    </div>
   </div>
-</div>
+</template>
+
+<script src="/js/template.js" defer></script>
