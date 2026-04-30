@@ -3,16 +3,19 @@
 /**
  * SSH-aware bridge for EasyEngine + WP-CLI commands.
  *
- * When EE_OVER_SSH=true, every `ee …` invocation is rewritten as
- *   ssh -i <key> -o StrictHostKeyChecking=accept-new
- *       -o UserKnownHostsFile=/tmp/ee_known_hosts
- *       <user>@<host>  ee  <args…>
+ * SSH transport semantics (the part that bites people):
+ *   `ssh user@host argv1 argv2 argv3`
+ *      → ssh joins argv1..N with single spaces into one command string
+ *      → that string is delivered to the remote sshd
+ *      → sshd hands it to the user's login shell, which parses it again
  *
- * Otherwise it's invoked locally (i.e. the binary must exist inside the
- * container — useful for dev on a machine that has EE installed natively).
+ * That second parse means we MUST single-quote every argument on the client
+ * side and pass the whole thing as ONE argv to ssh. Otherwise an arg like
+ *   --title=site title example.com
+ * would be re-split into three positional arguments on the host.
  *
- * The shape stays compatible with `commandRunner.run / runOrThrow` so callers
- * just swap `run(EE, args)` for `runEE(args)` and get SSH semantics for free.
+ * Pair this with an `authorized_keys` `command="eval ..."` wrapper on the
+ * host (see README) so the remote shell respects the quoting we send.
  */
 
 const { run, runOrThrow } = require('./commandRunner');
@@ -25,25 +28,40 @@ const SSH_OPTS = [
   '-o', 'ConnectTimeout=10'
 ];
 
+/**
+ * POSIX-safe single-quote shell escape. Anything alphanumeric or made up of
+ * common URL/CLI punctuation is left bare; everything else is wrapped in
+ * single quotes with embedded `'` rewritten as `'\''`.
+ */
+function shellQuote(arg) {
+  const s = String(arg);
+  if (s === '') return "''";
+  if (/^[A-Za-z0-9_./:=,\-+@]+$/.test(s)) return s;
+  return "'" + s.replace(/'/g, "'\\''") + "'";
+}
+
 function buildArgs(eeArgs) {
   if (!Array.isArray(eeArgs)) {
     throw new Error('eeArgs must be an array');
   }
+
   if (config.easyEngine.ssh.enabled) {
-    // The host's authorized_keys uses `command="/usr/local/bin/ee ..."` to
-    // restrict this key to ee invocations only. SSH passes our args as
-    // $SSH_ORIGINAL_COMMAND, which the wrapper appends. So we send only the
-    // ee subcommand args — the leading `ee` binary is implied on the host.
+    // Pre-quote every ee arg, join into a single command string, and hand
+    // that string to ssh as ONE argv. ssh will deliver it byte-for-byte to
+    // the remote `command="eval ..."` wrapper, which re-parses it with full
+    // POSIX quoting honoured.
+    const remoteCommand = eeArgs.map(shellQuote).join(' ');
     return {
       binary: 'ssh',
       args: [
         '-i', config.easyEngine.ssh.keyPath,
         ...SSH_OPTS,
         `${config.easyEngine.ssh.user}@${config.easyEngine.ssh.host}`,
-        ...eeArgs
+        remoteCommand
       ]
     };
   }
+
   return { binary: config.easyEngine.binary, args: eeArgs };
 }
 
