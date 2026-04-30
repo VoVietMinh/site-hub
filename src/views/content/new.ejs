@@ -1,0 +1,36 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title"><%= __('content.newJob') %></h1>
+    <p class="page-subtitle"><%= __('content.subtitle') %></p>
+  </div>
+  <a href="/content" class="btn"><%= __('common.back') %></a>
+</div>
+
+<form method="post" action="/content">
+  <div class="card">
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="form-row">
+          <label for="topic"><%= __('content.topic') %></label>
+          <input id="topic" name="topic" type="text" required value="<%= values.topic || '' %>" />
+        </div>
+        <div class="form-row">
+          <label for="num_keywords"><%= __('content.numKeywords') %></label>
+          <input id="num_keywords" name="num_keywords" type="number" min="1" max="100" value="<%= values.num_keywords || 5 %>" required />
+        </div>
+        <div class="form-row" style="grid-column: 1 / -1;">
+          <label for="site_domain"><%= __('content.site') %> <span class="muted"><%= __('content.siteOptional') %></span></label>
+          <select id="site_domain" name="site_domain">
+            <option value="">—</option>
+            <% sites.forEach(function(s) { %>
+              <option value="<%= s.domain %>" <%= values.site_domain === s.domain ? 'selected' : '' %>><%= s.domain %></option>
+            <% }) %>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="card-body" style="border-top:1px solid var(--border);">
+      <button class="btn btn-primary" type="submit"><%= __('content.submit') %></button>
+    </div>
+  </div>
+</form>

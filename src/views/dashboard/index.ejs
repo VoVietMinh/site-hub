@@ -1,0 +1,59 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title"><%= __('dashboard.title') %></h1>
+    <p class="page-subtitle"><%= __('dashboard.subtitle') %></p>
+  </div>
+  <a href="/sites/new" class="btn btn-primary"><%= __('sites.create') %></a>
+</div>
+
+<div class="stats">
+  <div class="stat">
+    <div class="stat-label"><%= __('dashboard.totalSites') %></div>
+    <div class="stat-value"><%= sites.length %></div>
+  </div>
+  <div class="stat">
+    <div class="stat-label"><%= __('dashboard.totalJobs') %></div>
+    <div class="stat-value"><%= jobs.length %></div>
+  </div>
+  <div class="stat">
+    <div class="stat-label"><%= __('dashboard.totalKeywords') %></div>
+    <div class="stat-value"><%= totalKeywords %></div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:20px;">
+  <div class="card-header">
+    <h3><%= __('dashboard.recentLogs') %></h3>
+    <a href="/logs" class="btn btn-sm"><%= __('logs.title') %></a>
+  </div>
+  <div class="card-body" style="padding:0;">
+    <% if (!recentLogs.length) { %>
+      <div class="empty"><%= __('logs.empty') %></div>
+    <% } else { %>
+    <table class="table">
+      <thead>
+        <tr>
+          <th><%= __('logs.time') %></th>
+          <th><%= __('logs.level') %></th>
+          <th><%= __('logs.category') %></th>
+          <th><%= __('logs.message') %></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% recentLogs.forEach(function(l) { %>
+        <tr>
+          <td class="muted"><%= l.created_at %></td>
+          <td>
+            <span class="tag <%= l.level === 'error' ? 'tag-red' : (l.level === 'warn' ? 'tag-yellow' : (l.level === 'info' ? 'tag-blue' : '')) %>">
+              <%= l.level %>
+            </span>
+          </td>
+          <td><%= l.category %></td>
+          <td><%= l.message %></td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <% } %>
+  </div>
+</div>

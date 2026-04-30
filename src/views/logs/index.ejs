@@ -1,0 +1,84 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title"><%= __('logs.title') %></h1>
+    <p class="page-subtitle"><%= __('logs.subtitle') %></p>
+  </div>
+</div>
+
+<form method="get" action="/logs" class="card" style="margin-bottom:14px;">
+  <div class="card-body" style="display:flex; gap:12px; align-items:end; flex-wrap:wrap;">
+    <div class="form-row" style="margin:0;">
+      <label><%= __('logs.level') %></label>
+      <select name="level">
+        <option value=""><%= __('logs.all') %></option>
+        <% ['debug','info','warn','error'].forEach(function(lv){ %>
+          <option value="<%= lv %>" <%= filter.level === lv ? 'selected' : '' %>><%= lv %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div class="form-row" style="margin:0;">
+      <label><%= __('logs.category') %></label>
+      <select name="category">
+        <option value=""><%= __('logs.all') %></option>
+        <% categories.forEach(function(c){ %>
+          <option value="<%= c %>" <%= filter.category === c ? 'selected' : '' %>><%= c %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div class="form-row" style="margin:0;">
+      <button class="btn" type="submit"><%= __('logs.filter') %></button>
+    </div>
+  </div>
+</form>
+
+<div class="card">
+  <% if (!items.length) { %>
+    <div class="empty"><%= __('logs.empty') %></div>
+  <% } else { %>
+  <table class="table">
+    <thead>
+      <tr>
+        <th><%= __('logs.time') %></th>
+        <th><%= __('logs.level') %></th>
+        <th><%= __('logs.category') %></th>
+        <th><%= __('logs.message') %></th>
+        <th><%= __('logs.user') %></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% items.forEach(function(l){ %>
+      <tr>
+        <td class="muted"><%= l.created_at %></td>
+        <td>
+          <span class="tag <%= l.level === 'error' ? 'tag-red' : (l.level === 'warn' ? 'tag-yellow' : (l.level === 'info' ? 'tag-blue' : '')) %>">
+            <%= l.level %>
+          </span>
+        </td>
+        <td><%= l.category %></td>
+        <td>
+          <%= l.message %>
+          <% if (l.meta_json) { %>
+            <details><summary class="muted" style="font-size:11px; cursor:pointer;">meta</summary>
+              <pre><%= l.meta_json %></pre>
+            </details>
+          <% } %>
+        </td>
+        <td class="muted"><%= l.user_name || '-' %></td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</div>
+
+<div style="margin-top:14px; display:flex; justify-content:space-between; align-items:center;">
+  <div class="muted"><%= __('logs.page') %> <%= page %> <%= __('logs.of') %> <%= pages %> · <%= total %> rows</div>
+  <div class="row-actions">
+    <% if (page > 1) { %>
+      <a class="btn btn-sm" href="?page=<%= page - 1 %>&limit=<%= limit %>&category=<%= filter.category || '' %>&level=<%= filter.level || '' %>">‹</a>
+    <% } %>
+    <% if (page < pages) { %>
+      <a class="btn btn-sm" href="?page=<%= page + 1 %>&limit=<%= limit %>&category=<%= filter.category || '' %>&level=<%= filter.level || '' %>">›</a>
+    <% } %>
+  </div>
+</div>

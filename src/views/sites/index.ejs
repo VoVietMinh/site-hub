@@ -1,0 +1,54 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title"><%= __('sites.title') %></h1>
+    <p class="page-subtitle"><%= __('sites.subtitle') %></p>
+  </div>
+  <a href="/sites/new" class="btn btn-primary"><%= __('sites.create') %></a>
+</div>
+
+<% if (refreshError) { %>
+  <div class="flash-item flash-info" style="margin-bottom:16px;">EE refresh failed: <%= refreshError %> — showing cached list.</div>
+<% } %>
+
+<div class="card">
+  <% if (!sites.length) { %>
+    <div class="empty"><%= __('sites.empty') %></div>
+  <% } else { %>
+  <table class="table">
+    <thead>
+      <tr>
+        <th><%= __('sites.domain') %></th>
+        <th><%= __('sites.type') %></th>
+        <th><%= __('sites.ssl') %></th>
+        <th><%= __('sites.status') %></th>
+        <th style="text-align:right;"><%= __('sites.actions') %></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% sites.forEach(function(s) { %>
+      <tr>
+        <td>
+          <a href="/sites/<%= encodeURIComponent(s.domain) %>"><%= s.domain %></a>
+          <% if (s.title) { %><div class="muted" style="font-size:12px;"><%= s.title %></div><% } %>
+        </td>
+        <td><span class="tag tag-blue"><%= s.site_type || 'wp' %></span></td>
+        <td><%= s.ssl ? __('common.yes') : __('common.no') %></td>
+        <td>
+          <% var c = (s.status === 'active') ? 'tag-green' : (s.status === 'configuring' ? 'tag-yellow' : ''); %>
+          <span class="tag <%= c %>"><%= s.status || 'unknown' %></span>
+        </td>
+        <td style="text-align:right;">
+          <div class="row-actions" style="justify-content:flex-end;">
+            <a href="/sites/<%= encodeURIComponent(s.domain) %>" class="btn btn-sm"><%= __('sites.view') %></a>
+            <form method="post" action="/sites/<%= encodeURIComponent(s.domain) %>/delete"
+                  onsubmit="return confirm('<%= __('sites.confirmDelete') %>')">
+              <button class="btn btn-sm btn-danger" type="submit"><%= __('sites.delete') %></button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</div>

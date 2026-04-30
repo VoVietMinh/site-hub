@@ -1,0 +1,10 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Error <%= status %></h1>
+    <p class="page-subtitle"><%= message %></p>
+  </div>
+  <a href="/" class="btn"><%= __('common.back') %></a>
+</div>
+<% if (stack) { %>
+<div class="card"><div class="card-body"><pre><%= stack %></pre></div></div>
+<% } %>

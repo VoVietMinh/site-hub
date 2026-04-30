@@ -1,0 +1,16 @@
+<aside class="sidebar">
+  <div class="brand"><span class="brand-dot"></span><span><%= appName %></span></div>
+  <div class="brand-tagline"><%= __('app.tagline') %></div>
+
+  <nav class="nav">
+    <a href="/" class="<%= path === '/' ? 'active' : '' %>"><%= __('nav.dashboard') %></a>
+    <a href="/sites" class="<%= path.startsWith('/sites') ? 'active' : '' %>"><%= __('nav.sites') %></a>
+    <a href="/content" class="<%= path.startsWith('/content') ? 'active' : '' %>"><%= __('nav.content') %></a>
+    <a href="/logs" class="<%= path.startsWith('/logs') ? 'active' : '' %>"><%= __('nav.logs') %></a>
+
+    <% if (currentUser && currentUser.role === 'SUPER_ADMIN') { %>
+      <div class="nav-section"><%= __('nav.users') %></div>
+      <a href="/users" class="<%= path.startsWith('/users') ? 'active' : '' %>"><%= __('nav.users') %></a>
+    <% } %>
+  </nav>
+</aside>

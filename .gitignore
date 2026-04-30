@@ -1,0 +1,9 @@
+node_modules
+.env
+data/*.db
+data/*.db-journal
+logs/*.log
+.DS_Store
+npm-debug.log*
+.vscode
+.idea

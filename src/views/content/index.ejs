@@ -1,0 +1,43 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title"><%= __('content.title') %></h1>
+    <p class="page-subtitle"><%= __('content.subtitle') %></p>
+  </div>
+  <a href="/content/new" class="btn btn-primary"><%= __('content.newJob') %></a>
+</div>
+
+<div class="card">
+  <% if (!jobs.length) { %>
+    <div class="empty"><%= __('content.empty') %></div>
+  <% } else { %>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th><%= __('content.topic') %></th>
+        <th><%= __('content.numKeywords') %></th>
+        <th><%= __('content.site') %></th>
+        <th><%= __('content.status') %></th>
+        <th><%= __('logs.time') %></th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% jobs.forEach(function(j) { %>
+      <tr>
+        <td>#<%= j.id %></td>
+        <td><%= j.topic %></td>
+        <td><%= j.num_keywords %></td>
+        <td><%= j.domain || '-' %></td>
+        <td>
+          <% var c = j.status === 'DONE' ? 'tag-green' : (j.status === 'RUNNING' ? 'tag-yellow' : 'tag-blue'); %>
+          <span class="tag <%= c %>"><%= j.status %></span>
+        </td>
+        <td class="muted"><%= j.created_at %></td>
+        <td><a class="btn btn-sm" href="/content/<%= j.id %>"><%= __('common.view') %></a></td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</div>

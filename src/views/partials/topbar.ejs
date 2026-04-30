@@ -1,0 +1,18 @@
+<header class="topbar">
+  <div class="crumbs"><%= title %></div>
+  <div class="topbar-right">
+    <span class="muted" style="font-size:12px;"><%= __('nav.language') %>:</span>
+    <span class="lang-switch">
+      <% supportedLocales.forEach(function(loc) { %>
+        <a href="/auth/lang/<%= loc %>" class="<%= loc === currentLocale ? 'active' : '' %>"><%= loc.toUpperCase() %></a>
+      <% }) %>
+    </span>
+    <% if (currentUser) { %>
+      <span class="muted" style="font-size:13px;"><%= currentUser.username %></span>
+      <span class="tag tag-blue"><%= currentUser.role %></span>
+      <form action="/auth/logout" method="post" style="display:inline;">
+        <button type="submit" class="btn btn-sm"><%= __('nav.logout') %></button>
+      </form>
+    <% } %>
+  </div>
+</header>

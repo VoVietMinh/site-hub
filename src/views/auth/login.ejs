@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="<%= currentLocale %>">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title><%= title %> · <%= appName %></title>
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body class="auth-shell">
+  <div class="auth-card">
+    <h1><%= __('auth.welcome') %></h1>
+    <div class="auth-sub"><%= appName %></div>
+
+    <%- include('../partials/flash') %>
+
+    <form method="post" action="/auth/login">
+      <div class="form-row">
+        <label for="username"><%= __('auth.username') %></label>
+        <input id="username" name="username" type="text" autocomplete="username" required value="<%= values.username || '' %>" />
+      </div>
+      <div class="form-row">
+        <label for="password"><%= __('auth.password') %></label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;"><%= __('auth.submit') %></button>
+      </div>
+    </form>
+
+    <div class="divider"></div>
+    <div class="lang-switch" style="display:flex; justify-content:center; gap:8px;">
+      <% supportedLocales.forEach(function(loc) { %>
+        <a href="/auth/lang/<%= loc %>" class="<%= loc === currentLocale ? 'active' : '' %>"><%= loc.toUpperCase() %></a>
+      <% }) %>
+    </div>
+    <div class="auth-footer"><%= __('auth.footer') %></div>
+  </div>
+</body>
+</html>

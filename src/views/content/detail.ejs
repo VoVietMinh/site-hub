@@ -1,0 +1,97 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Job #<%= job.id %> · <%= job.topic %></h1>
+    <p class="page-subtitle">
+      <%= __('content.numKeywords') %>: <%= job.num_keywords %> ·
+      <%= __('content.status') %>:
+      <span class="tag <%= job.status === 'DONE' ? 'tag-green' : (job.status === 'RUNNING' ? 'tag-yellow' : 'tag-blue') %>"><%= job.status %></span>
+    </p>
+  </div>
+  <a href="/content" class="btn"><%= __('common.back') %></a>
+</div>
+
+<div class="card">
+  <div class="card-header"><h3><%= __('content.runJob') %></h3></div>
+  <div class="card-body">
+    <p class="muted" style="margin-top:0;"><%= __('content.wpHelp') %></p>
+    <form method="post" action="/content/<%= job.id %>/run" class="form-grid" style="grid-template-columns: repeat(3, 1fr); align-items:end;">
+      <div class="form-row">
+        <label for="wp_user"><%= __('content.wpUser') %></label>
+        <input name="wp_user" id="wp_user" type="text" />
+      </div>
+      <div class="form-row">
+        <label for="wp_pass"><%= __('content.wpPass') %></label>
+        <input name="wp_pass" id="wp_pass" type="password" />
+      </div>
+      <div class="form-row">
+        <label for="wp_app_pass"><%= __('content.wpAppPass') %></label>
+        <input name="wp_app_pass" id="wp_app_pass" type="password" />
+      </div>
+      <div class="form-row" style="grid-column: 1 / -1;">
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary"><%= __('content.runJob') %></button>
+          <button type="submit" formaction="/content/<%= job.id %>/dispatch-n8n" class="btn"><%= __('content.dispatchN8n') %></button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><h3><%= __('content.title') %></h3></div>
+  <% if (!keywords.length) { %>
+    <div class="empty"><%= __('content.empty') %></div>
+  <% } else { %>
+  <table class="table">
+    <thead>
+      <tr>
+        <th><%= __('content.keyword') %></th>
+        <th><%= __('content.tone') %></th>
+        <th><%= __('content.outlines') %></th>
+        <th><%= __('content.category') %></th>
+        <th><%= __('content.publishStatus') %></th>
+        <th><%= __('content.status') %></th>
+        <th><%= __('content.postLink') %></th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% keywords.forEach(function(k) { %>
+      <tr>
+        <td>
+          <form id="form-<%= k.id %>" method="post" action="/content/<%= job.id %>/keywords/<%= k.id %>"></form>
+          <div><strong><%= k.keyword %></strong></div>
+          <% if (k.title) { %><div class="muted" style="font-size:12px;"><%= k.title %></div><% } %>
+        </td>
+        <td><input form="form-<%= k.id %>" name="tone" type="text" value="<%= k.tone %>" /></td>
+        <td><input form="form-<%= k.id %>" name="num_outlines" type="number" min="1" max="50" value="<%= k.num_outlines %>" style="width:80px;" /></td>
+        <td><input form="form-<%= k.id %>" name="category" type="text" value="<%= k.category || '' %>" /></td>
+        <td>
+          <select form="form-<%= k.id %>" name="publish_status">
+            <option value="publish" <%= k.publish_status === 'publish' ? 'selected' : '' %>>publish</option>
+            <option value="draft" <%= k.publish_status === 'draft' ? 'selected' : '' %>>draft</option>
+            <option value="pending" <%= k.publish_status === 'pending' ? 'selected' : '' %>>pending</option>
+          </select>
+        </td>
+        <td>
+          <% var st = k.status; var c = st === 'PUBLISHED' ? 'tag-green' : (st === 'ERROR' ? 'tag-red' : (st === 'PENDING' ? '' : 'tag-yellow')); %>
+          <span class="tag <%= c %>"><%= st %></span>
+          <% if (k.error_message) { %><div class="muted" style="font-size:11px;"><%= k.error_message %></div><% } %>
+        </td>
+        <td>
+          <% if (k.post_link) { %><a href="<%= k.post_link %>" target="_blank" rel="noopener"><%= __('common.view') %></a><% } %>
+        </td>
+        <td>
+          <div class="row-actions">
+            <button form="form-<%= k.id %>" type="submit" class="btn btn-sm"><%= __('content.save') %></button>
+            <form method="post" action="/content/<%= job.id %>/keywords/<%= k.id %>/run" style="display:inline;">
+              <button type="submit" class="btn btn-sm btn-primary"><%= __('content.run') %></button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</div>

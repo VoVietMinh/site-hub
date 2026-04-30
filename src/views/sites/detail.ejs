@@ -1,0 +1,36 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title"><%= domain %></h1>
+    <p class="page-subtitle"><%= __('sites.details') %></p>
+  </div>
+  <div class="row-actions">
+    <a href="/sites" class="btn"><%= __('common.back') %></a>
+    <form method="post" action="/sites/<%= encodeURIComponent(domain) %>/delete"
+          onsubmit="return confirm('<%= __('sites.confirmDelete') %>')">
+      <button class="btn btn-danger" type="submit"><%= __('sites.delete') %></button>
+    </form>
+  </div>
+</div>
+
+<% if (local) { %>
+<div class="card">
+  <div class="card-header"><h3><%= __('sites.details') %></h3></div>
+  <div class="card-body">
+    <div class="form-grid">
+      <div><div class="muted" style="font-size:12px;"><%= __('sites.domain') %></div><div><%= local.domain %></div></div>
+      <div><div class="muted" style="font-size:12px;"><%= __('sites.type') %></div><div><%= local.site_type %></div></div>
+      <div><div class="muted" style="font-size:12px;"><%= __('sites.ssl') %></div><div><%= local.ssl ? __('common.yes') : __('common.no') %></div></div>
+      <div><div class="muted" style="font-size:12px;"><%= __('sites.status') %></div><div><%= local.status %></div></div>
+      <% if (local.title) { %><div><div class="muted" style="font-size:12px;"><%= __('sites.title_field') %></div><div><%= local.title %></div></div><% } %>
+      <% if (local.description) { %><div style="grid-column: 1 / -1;"><div class="muted" style="font-size:12px;"><%= __('sites.description') %></div><div><%= local.description %></div></div><% } %>
+    </div>
+  </div>
+</div>
+<% } %>
+
+<div class="card">
+  <div class="card-header"><h3><%= __('sites.rawInfo') %></h3></div>
+  <div class="card-body">
+    <pre><%= typeof eeInfo === 'string' ? eeInfo : JSON.stringify(eeInfo, null, 2) %></pre>
+  </div>
+</div>

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="<%= currentLocale %>">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title><%= title %> · <%= appName %></title>
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body>
+  <div class="layout">
+    <%- include('../partials/sidebar') %>
+    <main class="main">
+      <%- include('../partials/topbar') %>
+      <section class="content">
+        <%- include('../partials/flash') %>
+        <%- body %>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

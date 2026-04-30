@@ -1,0 +1,57 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title"><%= __('sites.create') %></h1>
+    <p class="page-subtitle"><%= __('sites.subtitle') %></p>
+  </div>
+  <a href="/sites" class="btn"><%= __('common.back') %></a>
+</div>
+
+<form method="post" action="/sites">
+  <div class="card">
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="form-row">
+          <label for="domain"><%= __('sites.domain') %></label>
+          <input id="domain" name="domain" type="text" required placeholder="example.com" value="<%= values.domain || '' %>" />
+          <div class="help">e.g. blog.example.com</div>
+        </div>
+        <div class="form-row">
+          <label for="title"><%= __('sites.title_field') %></label>
+          <input id="title" name="title" type="text" value="<%= values.title || '' %>" />
+        </div>
+        <div class="form-row" style="grid-column: 1 / -1;">
+          <label for="description"><%= __('sites.description') %></label>
+          <input id="description" name="description" type="text" value="<%= values.description || '' %>" />
+        </div>
+
+        <div class="form-row">
+          <label for="admin_user"><%= __('sites.adminUser') %></label>
+          <input id="admin_user" name="admin_user" type="text" value="<%= values.admin_user || '' %>" />
+        </div>
+        <div class="form-row">
+          <label for="admin_pass"><%= __('sites.adminPass') %></label>
+          <input id="admin_pass" name="admin_pass" type="password" />
+        </div>
+        <div class="form-row">
+          <label for="admin_email"><%= __('sites.adminEmail') %></label>
+          <input id="admin_email" name="admin_email" type="email" value="<%= values.admin_email || '' %>" />
+        </div>
+        <div class="form-row">
+          <label for="category"><%= __('sites.category') %></label>
+          <input id="category" name="category" type="text" value="<%= values.category || 'Blog' %>" />
+        </div>
+      </div>
+
+      <div class="checkbox" style="margin-top:8px;">
+        <input id="ssl" name="ssl" type="checkbox" <%= values.ssl ? 'checked' : '' %> />
+        <label for="ssl"><%= __('sites.ssl_help') %></label>
+      </div>
+    </div>
+    <div class="card-body" style="border-top:1px solid var(--border);">
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit"><%= __('sites.submit') %></button>
+        <a href="/sites" class="btn"><%= __('common.cancel') %></a>
+      </div>
+    </div>
+  </div>
+</form>

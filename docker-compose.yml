@@ -1,0 +1,21 @@
+version: "3.8"
+
+services:
+  panel:
+    build: .
+    image: ee-control-panel:latest
+    container_name: ee-control-panel
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    volumes:
+      # SQLite + log persistence
+      - ./data:/app/data
+      - ./logs:/app/logs
+      # Bind-mount the host EasyEngine binary + docker socket so the panel can
+      # actually run `ee site list / create / delete` against the host.
+      - /usr/local/bin/ee:/usr/local/bin/ee:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/easyengine:/opt/easyengine
