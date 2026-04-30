@@ -1,7 +1,16 @@
 node_modules
 .env
+
+# SQLite database + all runtime journal files
 data/*.db
 data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+data/site-template.json
+
+# Per-host SSH key for the EE bridge (must NEVER be in git)
+secrets/
+
 logs/*.log
 .DS_Store
 npm-debug.log*
