@@ -65,7 +65,14 @@ async function createSite(domain, options = {}) {
 
   const args = ['site', 'create', domain, `--type=${options.type || 'wp'}`];
 
+  if (options.cache !== false) args.push('--cache');         // redis page cache by default
   if (options.ssl) args.push('--ssl=le');
+  if (options.title) {
+    if (typeof options.title !== 'string' || options.title.length > 200) {
+      throw new Error('invalid title');
+    }
+    args.push(`--title=${options.title}`);
+  }
   if (options.adminUser) {
     if (!v.isValidUsername(options.adminUser)) throw new Error('invalid admin user');
     args.push(`--admin-user=${options.adminUser}`);
@@ -79,7 +86,7 @@ async function createSite(domain, options = {}) {
     args.push(`--admin-email=${options.adminEmail}`);
   }
 
-  // EE site create can take many minutes when pulling images for the first time.
+  // EE site create can take many minutes when pulling images the first time.
   return runOrThrow(args, { category: 'easyengine', timeoutMs: 30 * 60 * 1000 });
 }
 

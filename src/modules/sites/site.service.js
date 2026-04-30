@@ -9,6 +9,7 @@ const wp = require('../../services/wordpressService');
 const repo = require('./site.repository');
 const v = require('../../utils/validators');
 const logRepo = require('../logs/log.repository');
+const passwordGenerator = require('../../utils/passwordGenerator');
 
 async function refreshFromEE(userId) {
   const list = await ee.listSites();
@@ -42,6 +43,13 @@ async function info(domain) {
   return { local, eeInfo };
 }
 
+/**
+ * Create a brand-new WordPress site end-to-end.
+ *
+ * Returns BOTH the persisted site row and the credentials used during
+ * creation (admin user/email/password). Callers (the controller) decide
+ * whether to surface the password in the UI.
+ */
 async function createFull({
   domain,
   title,
@@ -55,6 +63,16 @@ async function createFull({
 }) {
   v.assertDomain(domain);
 
+  // Defaults that match the legacy bash script's intent:
+  //   ADMIN_USER="admin"
+  //   ADMIN_PASS="$(openssl rand -base64 18)"
+  //   ADMIN_EMAIL="admin@$DOMAIN"
+  const finalAdminUser  = adminUser  && adminUser.trim()  ? adminUser  : 'admin';
+  const finalAdminEmail = adminEmail && adminEmail.trim() ? adminEmail : `admin@${domain}`;
+  const generatedPass   = !adminPass || !adminPass.trim();
+  const finalAdminPass  = generatedPass ? passwordGenerator.generate(20) : adminPass;
+  const siteTitle       = title && title.trim() ? title : domain;
+
   await logRepo.write({
     level: 'info',
     category: 'sites',
@@ -62,8 +80,16 @@ async function createFull({
     userId
   });
 
-  // 1) ee site create
-  await ee.createSite(domain, { type: 'wp', ssl, adminUser, adminPass, adminEmail });
+  // 1) ee site create — also passes --cache, --title, admin-* (matches bash script)
+  await ee.createSite(domain, {
+    type: 'wp',
+    cache: true,
+    ssl,
+    title: siteTitle,
+    adminUser: finalAdminUser,
+    adminPass: finalAdminPass,
+    adminEmail: finalAdminEmail
+  });
 
   // Persist a record immediately so the UI shows progress.
   repo.upsert({
@@ -71,15 +97,25 @@ async function createFull({
     site_type: 'wp',
     ssl: ssl ? 1 : 0,
     status: 'configuring',
-    title,
+    title: siteTitle,
     description,
     created_by: userId || null
   });
 
-  // 2) WP configuration
-  const cfg = await wp.configureNewSite(domain, { title, description, category });
+  // 2) WP configuration via the persisted site template
+  const cfg = await wp.configureNewSite(domain, {
+    title: siteTitle,
+    description,
+    category
+  });
 
-  repo.upsert({ domain, status: 'active', title, description, created_by: userId || null });
+  repo.upsert({
+    domain,
+    status: 'active',
+    title: siteTitle,
+    description,
+    created_by: userId || null
+  });
 
   await logRepo.write({
     level: 'info',
@@ -89,7 +125,18 @@ async function createFull({
     userId
   });
 
-  return repo.findByDomain(domain);
+  return {
+    site: repo.findByDomain(domain),
+    cfg,
+    credentials: {
+      url: `${ssl ? 'https' : 'http'}://${domain}`,
+      adminUrl: `${ssl ? 'https' : 'http'}://${domain}/wp-admin`,
+      user: finalAdminUser,
+      password: finalAdminPass,
+      email: finalAdminEmail,
+      passwordGenerated: generatedPass
+    }
+  };
 }
 
 async function remove(domain, userId) {

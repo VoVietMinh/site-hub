@@ -34,6 +34,7 @@ const siteRoutes = require('./modules/sites/site.routes');
 const contentRoutes = require('./modules/content/content.routes');
 const userRoutes = require('./modules/users/user.routes');
 const logRoutes = require('./modules/logs/log.routes');
+const templateRoutes = require('./modules/template/template.routes');
 
 // --- 1. DB migrate + seed --------------------------------------------------
 migrate();
@@ -91,6 +92,7 @@ app.use('/sites', siteRoutes);
 app.use('/content', contentRoutes);
 app.use('/users', userRoutes);
 app.use('/logs', logRoutes);
+app.use('/template', templateRoutes);
 
 // Health
 app.get('/healthz', (req, res) => res.json({ ok: true, env: config.env }));

@@ -1,0 +1,25 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title"><%= __('siteTemplate.title') %></h1>
+    <p class="page-subtitle"><%= __('siteTemplate.subtitle') %></p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h3>JSON</h3>
+    <span class="muted" style="font-size:12px;"><%= __('siteTemplate.filePath') %> <span class="code" style="display:inline-block;"><%= filePath %></span></span>
+  </div>
+  <div class="card-body">
+    <p class="muted" style="margin-top:0;"><%= __('siteTemplate.placeholders') %></p>
+    <form method="post" action="/template">
+      <div class="form-row">
+        <textarea name="json" rows="28" style="width:100%; font-family: ui-monospace, monospace; font-size: 12.5px; padding: 12px; border-radius: 6px; border: 1px solid var(--border-strong);"><%= json %></textarea>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary"><%= __('common.save') %></button>
+        <a href="/template" class="btn"><%= __('common.cancel') %></a>
+      </div>
+    </form>
+  </div>
+</div>

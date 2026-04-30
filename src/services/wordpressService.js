@@ -3,42 +3,45 @@
 /**
  * WordPress configuration via WP-CLI through EasyEngine.
  *
- * EasyEngine ships a wrapper:  `ee shell <domain> --command="wp ..."`
+ * Every WP-CLI invocation flows:
+ *   panel container
+ *     → eeBridge (ssh root@host)
+ *     → ee shell <domain> --command="wp <argv...> --allow-root"
+ *     → wp-cli inside the site's php container
  *
- * Every WP-CLI invocation routes through `eeBridge`, which prefixes the call
- * with `ssh user@host` when EE_OVER_SSH=true (production on Ubuntu) or runs
- * `ee` locally otherwise (dev). The container itself never executes EE or
- * PHP — that all happens on the host.
+ * We append `--allow-root` automatically because EE's shell runs as root and
+ * WP-CLI refuses to run as root without it.
  *
- * Safety: the inner wp argv is shell-quoted with single quotes (escaping
- * embedded single quotes the POSIX way) so the shell that EE spawns inside
- * the site's php container can't be tricked by user input.
+ * Safety: every wp arg is single-quoted (POSIX-style with `'\''` escape) so
+ * the shell that EE spawns inside the site container can't be tricked by
+ * user input — even with HTML page content full of quotes and angle brackets.
  */
 
 const { runEE: run, runEEOrThrow: runOrThrow } = require('./eeBridge');
 const v = require('../utils/validators');
+const siteTemplate = require('./siteTemplate');
 
-/**
- * Build a wp-cli argv as a single shell-safe string.
- */
+// ---------------------------------------------------------------------------
+// Inner shell quoting
+// ---------------------------------------------------------------------------
 function shellQuote(arg) {
-  if (/^[A-Za-z0-9_./:=,\-]+$/.test(arg)) return arg;
-  return "'" + String(arg).replace(/'/g, "'\\''") + "'";
+  const s = String(arg);
+  if (/^[A-Za-z0-9_./:=,\-]+$/.test(s)) return s;
+  return "'" + s.replace(/'/g, "'\\''") + "'";
 }
 
 function buildWpCommand(wpArgv) {
-  return ['wp', ...wpArgv].map(shellQuote).join(' ');
+  // --allow-root is appended once at the end of every wp invocation
+  return ['wp', ...wpArgv, '--allow-root'].map(shellQuote).join(' ');
 }
 
-/**
- * Run a WP-CLI command for a given site.
- * @param {string} domain
- * @param {string[]} wpArgv  e.g. ['theme','install','newspare','--activate']
- */
+// ---------------------------------------------------------------------------
+// Core wrapper
+// ---------------------------------------------------------------------------
 async function wp(domain, wpArgv, opts = {}) {
   v.assertDomain(domain);
   if (!Array.isArray(wpArgv) || !wpArgv.length) {
-    throw new Error('wpArgv must be non-empty array');
+    throw new Error('wpArgv must be a non-empty array');
   }
   const command = buildWpCommand(wpArgv);
   return runOrThrow(
@@ -47,41 +50,122 @@ async function wp(domain, wpArgv, opts = {}) {
   );
 }
 
+/**
+ * Like `wp()` but never throws on non-zero exit — useful for `term create`
+ * (already-exists) and `menu delete` (not-found).
+ */
+async function wpSoft(domain, wpArgv, opts = {}) {
+  v.assertDomain(domain);
+  const command = buildWpCommand(wpArgv);
+  return run(
+    ['shell', domain, `--command=${command}`],
+    { category: 'wp-cli', timeoutMs: opts.timeoutMs || 10 * 60 * 1000 }
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Site-wide options
+// ---------------------------------------------------------------------------
 async function setSiteOptions(domain, { title, description }) {
   if (title) await wp(domain, ['option', 'update', 'blogname', title]);
   if (description) await wp(domain, ['option', 'update', 'blogdescription', description]);
 }
 
+async function applyOptionMap(domain, options = {}) {
+  for (const [k, v_] of Object.entries(options)) {
+    if (v_ === null || v_ === undefined) continue;
+    await wp(domain, ['option', 'update', k, String(v_)]);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Theme + plugins
+// ---------------------------------------------------------------------------
 async function installTheme(domain, slug, { activate = true } = {}) {
   const args = ['theme', 'install', slug];
   if (activate) args.push('--activate');
   return wp(domain, args);
 }
 
+/**
+ * Install plugins one-at-a-time so a single bad slug doesn't abort the rest.
+ */
 async function installPlugins(domain, slugs, { activate = true } = {}) {
-  if (!Array.isArray(slugs) || !slugs.length) return;
-  const args = ['plugin', 'install', ...slugs];
-  if (activate) args.push('--activate');
-  await wp(domain, args);
+  if (!Array.isArray(slugs) || !slugs.length) return [];
+  const results = [];
+  for (const slug of slugs) {
+    const args = ['plugin', 'install', slug];
+    if (activate) args.push('--activate');
+    try {
+      await wp(domain, args);
+      results.push({ slug, ok: true });
+    } catch (err) {
+      results.push({ slug, ok: false, error: err.message });
+    }
+  }
+  return results;
 }
 
+// ---------------------------------------------------------------------------
+// Categories + pages (idempotent)
+// ---------------------------------------------------------------------------
 async function ensureCategory(domain, name) {
-  // Don't fail the whole pipeline if the term already exists.
-  const command = buildWpCommand(['term', 'create', 'category', name, '--porcelain']);
-  const r = await run(['shell', domain, `--command=${command}`], { category: 'wp-cli' });
+  if (!name) return null;
+  const r = await wpSoft(domain, ['term', 'create', 'category', name, '--porcelain']);
   return r.stdout.trim();
 }
 
-async function createPage(domain, { title, content = '', status = 'publish' }) {
+async function findPageBySlug(domain, slug) {
+  const r = await wp(domain, ['post', 'list', '--post_type=page', `--name=${slug}`, '--field=ID']);
+  const lines = r.stdout.trim().split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (!lines.length) return null;
+  // wp-cli sometimes prints a leading "Success: …" line — take the last numeric line.
+  const last = lines[lines.length - 1];
+  const id = parseInt(last, 10);
+  return Number.isFinite(id) ? id : null;
+}
+
+async function createOrUpdatePage(domain, { slug, title, content }) {
+  const existing = await findPageBySlug(domain, slug);
+  if (existing) {
+    await wp(domain, [
+      'post', 'update', String(existing),
+      `--post_title=${title}`,
+      `--post_content=${content}`
+    ]);
+    return existing;
+  }
   const r = await wp(domain, [
     'post', 'create',
-    `--post_type=page`,
+    '--post_type=page',
+    '--post_status=publish',
     `--post_title=${title}`,
-    `--post_status=${status}`,
+    `--post_name=${slug}`,
     `--post_content=${content}`,
     '--porcelain'
   ]);
   return parseInt(r.stdout.trim(), 10);
+}
+
+// Legacy method kept for backward compatibility (used by the older tests).
+async function createPage(domain, { title, content = '', status = 'publish' }) {
+  const r = await wp(domain, [
+    'post', 'create',
+    '--post_type=page',
+    `--post_status=${status}`,
+    `--post_title=${title}`,
+    `--post_content=${content}`,
+    '--porcelain'
+  ]);
+  return parseInt(r.stdout.trim(), 10);
+}
+
+// ---------------------------------------------------------------------------
+// Menu (idempotent: delete-then-create + auto-locate theme menu slot)
+// ---------------------------------------------------------------------------
+async function deleteMenuByName(domain, name) {
+  const r = await wpSoft(domain, ['menu', 'delete', name]);
+  return r.code === 0;
 }
 
 async function createMenu(domain, name) {
@@ -89,86 +173,142 @@ async function createMenu(domain, name) {
   return parseInt(r.stdout.trim(), 10);
 }
 
-async function addPageToMenu(domain, menu, pageId) {
-  return wp(domain, ['menu', 'item', 'add-post', String(menu), String(pageId)]);
+async function addItemToMenu(domain, menuName, postId, menuTitle) {
+  const args = ['menu', 'item', 'add-post', menuName, String(postId)];
+  if (menuTitle) args.push(`--title=${menuTitle}`);
+  return wp(domain, args);
 }
 
-async function assignMenuToLocation(domain, menu, location = 'primary') {
-  return wp(domain, ['menu', 'location', 'assign', String(menu), location]);
+async function getFirstMenuLocation(domain) {
+  try {
+    const r = await wp(domain, [
+      'menu', 'location', 'list', '--fields=location', '--format=csv'
+    ]);
+    const lines = r.stdout.trim().split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    if (lines.length < 2) return null;
+    // CSV header on line 0; first real value on line 1
+    const first = lines[1].replace(/^"|"$/g, '');
+    return first || null;
+  } catch (_) {
+    return null;
+  }
 }
 
+async function assignMenuToLocation(domain, menuName, location) {
+  if (!location) return null;
+  return wp(domain, ['menu', 'location', 'assign', menuName, location]);
+}
+
+// ---------------------------------------------------------------------------
+// Maintenance
+// ---------------------------------------------------------------------------
 async function flushRewrite(domain) {
   return wp(domain, ['rewrite', 'flush', '--hard']);
 }
-
 async function flushCache(domain) {
   return wp(domain, ['cache', 'flush']);
 }
-
 async function getSiteUrl(domain) {
   const r = await wp(domain, ['option', 'get', 'siteurl']);
   return r.stdout.trim();
 }
-
 async function getAdminPassword(domain) {
   const r = await run(['site', 'info', domain], { category: 'easyengine' });
   return r.stdout;
 }
 
+// ---------------------------------------------------------------------------
+// Full onboarding pipeline
+// ---------------------------------------------------------------------------
+/**
+ * Configure a brand-new (or already-existing) WordPress site according to
+ * the persisted siteTemplate. Idempotent: safe to re-run.
+ *
+ * @param {string} domain
+ * @param {{ title?: string, description?: string, category?: string }} opts
+ * @returns {Promise<object>}  summary of work done
+ */
 async function configureNewSite(domain, opts = {}) {
-  const {
-    title,
-    description,
-    theme = 'newspare',
-    plugins = [
-      'auto-upload-images',
-      'ip2location-country-blocker',
-      'seo-by-rank-math',
-      'json-api-auth'
-    ],
-    category = 'Blog',
-    pages = [
-      { title: 'About Us' },
-      { title: 'Contact Us' },
-      { title: 'Privacy Policy' },
-      { title: 'Terms of Service' },
-      { title: 'Disclaimer' }
-    ],
-    menuName = 'Primary Menu'
-  } = opts;
+  const tpl = siteTemplate.load();
+  const websiteName = opts.title || domain;
+  const description = opts.description || '';
+  const vars = { domain, websiteName, description };
 
-  await setSiteOptions(domain, { title, description });
-  await installTheme(domain, theme, { activate: true });
-  await installPlugins(domain, plugins, { activate: true });
-  await ensureCategory(domain, category);
+  // 1) Site identity + global options
+  await setSiteOptions(domain, { title: websiteName, description });
+  await applyOptionMap(domain, tpl.options || {});
 
-  const pageIds = [];
-  for (const p of pages) {
-    const id = await createPage(domain, p);
-    if (Number.isFinite(id)) pageIds.push(id);
+  // 2) Theme
+  await installTheme(domain, tpl.theme, { activate: true });
+
+  // 3) Plugins
+  const pluginResults = await installPlugins(domain, tpl.plugins || [], { activate: true });
+
+  // 4) Default category
+  if (opts.category) await ensureCategory(domain, opts.category);
+
+  // 5) Pages with placeholder substitution + slug-based idempotency
+  const pageRecords = [];
+  for (const page of tpl.pages || []) {
+    const renderedTitle = siteTemplate.applyTemplate(page.title, vars);
+    const renderedContent = siteTemplate.applyTemplate(page.content, vars);
+    const id = await createOrUpdatePage(domain, {
+      slug: page.slug,
+      title: renderedTitle,
+      content: renderedContent
+    });
+    if (Number.isFinite(id)) {
+      pageRecords.push({
+        id,
+        slug: page.slug,
+        menuTitle: siteTemplate.applyTemplate(page.menuTitle || page.title, vars)
+      });
+    }
   }
 
+  // 6) Menu — delete-then-create so re-runs don't duplicate
+  const menuName = tpl.menuName || 'Main Menu';
+  await deleteMenuByName(domain, menuName);
   const menuId = await createMenu(domain, menuName);
-  for (const pid of pageIds) {
-    await addPageToMenu(domain, menuId, pid);
+  for (const p of pageRecords) {
+    await addItemToMenu(domain, menuName, p.id, p.menuTitle);
   }
-  await assignMenuToLocation(domain, menuId, 'primary');
 
+  // 7) Auto-detect theme's primary menu location and assign there
+  const menuLocation = await getFirstMenuLocation(domain);
+  if (menuLocation) {
+    await assignMenuToLocation(domain, menuName, menuLocation);
+  }
+
+  // 8) Caches
   await flushCache(domain).catch(() => {});
   await flushRewrite(domain);
 
-  return { theme, plugins, pageIds, menuId };
+  return {
+    theme: tpl.theme,
+    plugins: pluginResults,
+    pages: pageRecords,
+    menuName,
+    menuId,
+    menuLocation: menuLocation || null
+  };
 }
 
 module.exports = {
   wp,
+  wpSoft,
   setSiteOptions,
+  applyOptionMap,
   installTheme,
   installPlugins,
   ensureCategory,
+  findPageBySlug,
+  createOrUpdatePage,
   createPage,
+  deleteMenuByName,
   createMenu,
-  addPageToMenu,
+  addItemToMenu,
+  getFirstMenuLocation,
   assignMenuToLocation,
   flushRewrite,
   flushCache,

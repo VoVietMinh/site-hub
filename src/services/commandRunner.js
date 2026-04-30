@@ -19,9 +19,13 @@ const logRepo = require('../modules/logs/log.repository');
 
 const ALLOWED_BINARIES = new Set(['ee', 'wp', 'docker', 'ssh']);
 
-// One token = letters / digits / common shell-safe punctuation. We deliberately
-// reject backticks, $, ;, &, |, >, <, (, ), {, }, *, ?, etc.
-const SAFE_ARG_RE = /^[A-Za-z0-9_@:./=,+\-\s]*$/;
+// We run with `shell: false`, so spawn passes argv to the binary byte-for-byte
+// without any shell expansion. The dangerous chars are therefore: NULL bytes
+// (truncate C strings) and excessive length (DoS). Downstream shell injection
+// is prevented by the per-layer quoting in wordpressService.shellQuote, where
+// we deliberately wrap WP-CLI args in single quotes before they ride inside
+// `ee shell --command=...`.
+const MAX_ARG_LEN = 65536;
 
 function validateArgs(args) {
   if (!Array.isArray(args)) throw new Error('args must be an array');
@@ -29,8 +33,11 @@ function validateArgs(args) {
     if (typeof a !== 'string') {
       throw new Error('every arg must be a string');
     }
-    if (!SAFE_ARG_RE.test(a)) {
-      throw new Error(`unsafe argument rejected: ${JSON.stringify(a)}`);
+    if (a.length > MAX_ARG_LEN) {
+      throw new Error(`arg too long (>${MAX_ARG_LEN} chars)`);
+    }
+    if (a.includes('\0')) {
+      throw new Error('NULL byte in arg is not allowed');
     }
   }
 }

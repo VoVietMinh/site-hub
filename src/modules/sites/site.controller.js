@@ -40,7 +40,7 @@ exports.create = asyncHandler(async (req, res) => {
   }
 
   try {
-    const s = await service.createFull({
+    const result = await service.createFull({
       domain,
       title,
       description,
@@ -51,8 +51,14 @@ exports.create = asyncHandler(async (req, res) => {
       category,
       userId: req.session.user.id
     });
-    req.flash('success', res.__('sites.created', { domain: s.domain }));
-    res.redirect('/sites/' + encodeURIComponent(s.domain));
+    // Render the success page directly (no redirect) so the generated admin
+    // password is shown ONCE and never lands in browser history / URL.
+    res.render('sites/created', {
+      title: res.__('sites.created', { domain: result.site.domain }),
+      site: result.site,
+      cfg: result.cfg,
+      credentials: result.credentials
+    });
   } catch (err) {
     req.flash('error', err.message);
     res.status(500).render('sites/create', { title: res.__('sites.create'), values: req.body });

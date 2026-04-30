@@ -9,8 +9,9 @@
     <a href="/logs" class="<%= path.startsWith('/logs') ? 'active' : '' %>"><%= __('nav.logs') %></a>
 
     <% if (currentUser && currentUser.role === 'SUPER_ADMIN') { %>
-      <div class="nav-section"><%= __('nav.users') %></div>
+      <div class="nav-section">Admin</div>
       <a href="/users" class="<%= path.startsWith('/users') ? 'active' : '' %>"><%= __('nav.users') %></a>
+      <a href="/template" class="<%= path.startsWith('/template') ? 'active' : '' %>"><%= __('siteTemplate.title') %></a>
     <% } %>
   </nav>
 </aside>
