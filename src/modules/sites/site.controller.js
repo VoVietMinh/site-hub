@@ -15,9 +15,19 @@ exports.index = asyncHandler(async (req, res) => {
     refreshError = e.message;
     sites = service.listLocal();
   }
+
+  // Lightweight stats for the header strip.
+  const stats = {
+    total: sites.length,
+    active: sites.filter((s) => s.status === 'active').length,
+    configuring: sites.filter((s) => s.status === 'configuring').length,
+    ssl: sites.filter((s) => s.ssl).length
+  };
+
   res.render('sites/index', {
     title: res.__('sites.title'),
     sites,
+    stats,
     refreshError
   });
 });
@@ -51,8 +61,6 @@ exports.create = asyncHandler(async (req, res) => {
       category,
       userId: req.session.user.id
     });
-    // Render the success page directly (no redirect) so the generated admin
-    // password is shown ONCE and never lands in browser history / URL.
     res.render('sites/created', {
       title: res.__('sites.created', { domain: result.site.domain }),
       site: result.site,
@@ -73,7 +81,9 @@ exports.detail = asyncHandler(async (req, res) => {
     title: domain,
     domain,
     local: data.local,
-    eeInfo: data.eeInfo
+    eeInfo: data.eeInfo,
+    table: (data.eeInfo && data.eeInfo.table) || {},
+    recentLogs: data.recentLogs || []
   });
 });
 

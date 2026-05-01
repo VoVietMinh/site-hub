@@ -34,13 +34,23 @@ function listLocal() {
 async function info(domain) {
   v.assertDomain(domain);
   const local = repo.findByDomain(domain);
-  let eeInfo = null;
+
+  let eeInfo = { raw: null, table: {}, json: null, error: null };
   try {
     eeInfo = await ee.siteInfo(domain);
   } catch (e) {
-    eeInfo = { error: e.message };
+    eeInfo.error = e.message;
   }
-  return { local, eeInfo };
+
+  // Pull a slice of activity that mentions this domain anywhere in the
+  // message or meta payload — handy for surfacing the create/configure
+  // history right on the detail page.
+  let recentLogs = [];
+  try {
+    recentLogs = logRepo.searchByMessage(domain, 30);
+  } catch (_) { /* non-fatal */ }
+
+  return { local, eeInfo, recentLogs };
 }
 
 /**

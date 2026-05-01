@@ -19,6 +19,36 @@ function tryParseJson(s) {
 }
 
 /**
+ * Parse the ASCII table that `ee site info <domain>` prints when --format=json
+ * isn't available, e.g.
+ *
+ *   +--------------------+-----------------------------------------+
+ *   | Site               | https://snoopy.zuluha.com               |
+ *   | WordPress Username | admin                                   |
+ *   | DB Host            | global-db                               |
+ *   ...
+ *   +--------------------+-----------------------------------------+
+ *
+ * Returns a flat { key: value } map. Lines that aren't `| key | value |`
+ * pairs are ignored.
+ */
+function parseEeInfoTable(raw) {
+  const out = {};
+  if (!raw || typeof raw !== 'string') return out;
+  for (const line of raw.split(/\r?\n/)) {
+    if (!line.startsWith('|') || !line.endsWith('|')) continue;
+    const parts = line.split('|').map((s) => s.trim());
+    // ['', key, value, '']
+    if (parts.length !== 4) continue;
+    const k = parts[1];
+    const v = parts[2];
+    if (!k) continue;
+    out[k] = v;
+  }
+  return out;
+}
+
+/**
  * Parse plain-text `ee site list` output as a fallback when --format=json
  * isn't supported by the installed EE version.
  */
@@ -46,18 +76,29 @@ async function listSites() {
   return parsePlainList(r2.stdout);
 }
 
+/**
+ * Always returns { raw, table, json }:
+ *   - raw   : original CLI output (string)
+ *   - table : flat key/value map parsed from the ASCII table
+ *   - json  : structured object if EE returned --format=json (else null)
+ */
 async function siteInfo(domain) {
   v.assertDomain(domain);
-  const r = await run(['site', 'info', domain, '--format=json'], {
-    category: 'easyengine'
-  });
+
+  // Try the JSON path first
+  const r = await run(['site', 'info', domain, '--format=json'], { category: 'easyengine' });
   if (r.code === 0) {
     const json = tryParseJson(r.stdout);
-    if (json) return json;
-    return { raw: r.stdout };
+    if (json) return { raw: r.stdout, table: {}, json };
   }
+
+  // Fall back to the ASCII table format
   const r2 = await runOrThrow(['site', 'info', domain], { category: 'easyengine' });
-  return { raw: r2.stdout };
+  return {
+    raw: r2.stdout,
+    table: parseEeInfoTable(r2.stdout),
+    json: null
+  };
 }
 
 async function createSite(domain, options = {}) {
@@ -98,4 +139,4 @@ async function deleteSite(domain) {
   });
 }
 
-module.exports = { listSites, siteInfo, createSite, deleteSite };
+module.exports = { listSites, siteInfo, createSite, deleteSite, parseEeInfoTable };

@@ -1,36 +1,241 @@
+<%
+  var t = table || {};
+  // The exact key names ee site info prints:
+  var siteUrlFromEE = t['Site'] || '';
+  var ssl   = (t['SSL'] || (local && local.ssl ? 'Enabled' : 'Disabled')).toString();
+  var sslOn = /enabled/i.test(ssl);
+  var protocol  = sslOn ? 'https' : 'http';
+  var siteUrl   = siteUrlFromEE || (protocol + '://' + domain);
+  var adminUrl  = (siteUrlFromEE || (protocol + '://' + domain)) + '/wp-admin';
+  var siteTitle = t['Site Title'] || (local && local.title) || domain;
+%>
 <div class="page-header">
   <div>
-    <h1 class="page-title"><%= domain %></h1>
-    <p class="page-subtitle"><%= __('sites.details') %></p>
+    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+      <h1 class="page-title" style="margin-bottom:2px;"><%= siteTitle %></h1>
+      <% if (sslOn) { %>
+        <span class="tag tag-green">🔒 <%= __('sites.secure') %></span>
+      <% } else { %>
+        <span class="tag tag-gray"><%= __('sites.insecure') %></span>
+      <% } %>
+      <% if (local) { %>
+        <% var c = local.status === 'active' ? 'tag-green'
+                : (local.status === 'configuring' ? 'tag-yellow' : 'tag-gray'); %>
+        <span class="tag <%= c %>"><%= local.status %></span>
+      <% } %>
+      <% if (t['Cache']) { %>
+        <span class="tag tag-blue">Cache: <%= t['Cache'] %></span>
+      <% } %>
+    </div>
+    <p class="page-subtitle">
+      <a href="<%= siteUrl %>" target="_blank" rel="noopener" style="color:var(--slate); font-weight:500;"><%= domain %></a>
+      <% if (local && local.description) { %> · <%= local.description %><% } %>
+    </p>
   </div>
   <div class="row-actions">
     <a href="/sites" class="btn"><%= __('common.back') %></a>
+    <a href="<%= siteUrl %>" target="_blank" rel="noopener" class="btn">↗ <%= __('sites.visit') %></a>
+    <a href="<%= adminUrl %>" target="_blank" rel="noopener" class="btn btn-primary">WP <%= __('sites.wpAdmin') %></a>
     <form method="post" action="/sites/<%= encodeURIComponent(domain) %>/delete"
-          onsubmit="return confirm('<%= __('sites.confirmDelete') %>')">
+          onsubmit="return confirm('<%= __('sites.confirmDelete') %>')" style="display:inline;">
       <button class="btn btn-danger" type="submit"><%= __('sites.delete') %></button>
     </form>
   </div>
 </div>
 
-<% if (local) { %>
+<% if (eeInfo && eeInfo.error) { %>
+  <div class="flash-item flash-info" style="margin-bottom:16px;">
+    EasyEngine info unavailable: <%= eeInfo.error %>
+  </div>
+<% } %>
+
+<!-- =================== Overview =================== -->
 <div class="card">
-  <div class="card-header"><h3><%= __('sites.details') %></h3></div>
+  <div class="card-header"><h3><%= __('sites.overview') %></h3></div>
   <div class="card-body">
-    <div class="form-grid">
-      <div><div class="muted" style="font-size:12px;"><%= __('sites.domain') %></div><div><%= local.domain %></div></div>
-      <div><div class="muted" style="font-size:12px;"><%= __('sites.type') %></div><div><%= local.site_type %></div></div>
-      <div><div class="muted" style="font-size:12px;"><%= __('sites.ssl') %></div><div><%= local.ssl ? __('common.yes') : __('common.no') %></div></div>
-      <div><div class="muted" style="font-size:12px;"><%= __('sites.status') %></div><div><%= local.status %></div></div>
-      <% if (local.title) { %><div><div class="muted" style="font-size:12px;"><%= __('sites.title_field') %></div><div><%= local.title %></div></div><% } %>
-      <% if (local.description) { %><div style="grid-column: 1 / -1;"><div class="muted" style="font-size:12px;"><%= __('sites.description') %></div><div><%= local.description %></div></div><% } %>
+    <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+      <div>
+        <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:.08em; font-weight:600; margin-bottom:4px;"><%= __('sites.frontUrl') %></div>
+        <div><a href="<%= siteUrl %>" target="_blank" rel="noopener" style="font-weight:500;"><%= siteUrl %></a></div>
+      </div>
+      <div>
+        <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:.08em; font-weight:600; margin-bottom:4px;"><%= __('sites.adminUrl') %></div>
+        <div><a href="<%= adminUrl %>" target="_blank" rel="noopener" style="font-weight:500;"><%= adminUrl %></a></div>
+      </div>
+
+      <div>
+        <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:.08em; font-weight:600; margin-bottom:4px;"><%= __('sites.title_field') %></div>
+        <div style="font-family:var(--font-serif); font-weight:600; color:var(--navy-ink);"><%= siteTitle %></div>
+      </div>
+      <div>
+        <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:.08em; font-weight:600; margin-bottom:4px;"><%= __('sites.description') %></div>
+        <div><%= (local && local.description) || '—' %></div>
+      </div>
+
+      <div>
+        <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:.08em; font-weight:600; margin-bottom:4px;"><%= __('sites.ssl') %></div>
+        <div>
+          <%= ssl %>
+          <% if (t['SSL Wildcard']) { %><span class="muted" style="font-size:12px;"> · wildcard: <%= t['SSL Wildcard'] %></span><% } %>
+        </div>
+      </div>
+      <div>
+        <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:.08em; font-weight:600; margin-bottom:4px;"><%= __('sites.cache') %></div>
+        <div>
+          <%= t['Cache'] || '—' %>
+          <% if (t['Proxy Cache']) { %><span class="muted" style="font-size:12px;"> · proxy: <%= t['Proxy Cache'] %></span><% } %>
+        </div>
+      </div>
+
+      <% if (local && local.created_at) { %>
+      <div>
+        <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:.08em; font-weight:600; margin-bottom:4px;"><%= __('sites.createdAt') %></div>
+        <div><%= local.created_at %></div>
+      </div>
+      <% } %>
+      <% if (local && local.updated_at) { %>
+      <div>
+        <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:.08em; font-weight:600; margin-bottom:4px;"><%= __('sites.updatedAt') %></div>
+        <div><%= local.updated_at %></div>
+      </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<!-- =================== WordPress credentials =================== -->
+<% if (t['WordPress Username'] || t['E-Mail']) { %>
+<div class="card">
+  <div class="card-header">
+    <h3><%= __('sites.wpCredentials') %></h3>
+    <span class="muted" style="font-size:12px;"><%= __('sites.wpPasswordReveal') %></span>
+  </div>
+  <div class="card-body">
+    <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+      <div>
+        <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:.08em; font-weight:600; margin-bottom:4px;"><%= __('users.username') %></div>
+        <div class="code" style="display:inline-block;"><%= t['WordPress Username'] || 'admin' %></div>
+      </div>
+      <div>
+        <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:.08em; font-weight:600; margin-bottom:4px;"><%= __('users.email') %></div>
+        <div><%= t['E-Mail'] || ('admin@' + domain) %></div>
+      </div>
+      <% if (t['WordPress Password']) { %>
+      <div style="grid-column: 1 / -1;">
+        <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:.08em; font-weight:600; margin-bottom:4px;"><%= __('users.password') %></div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span class="code" id="wp-pw-mask" style="display:inline-block; cursor:pointer; user-select:none;"
+                data-secret="<%= t['WordPress Password'] %>"
+                onclick="this.textContent = this.getAttribute('data-secret'); this.style.cursor='text';">
+            ••••••••••••
+          </span>
+          <button type="button" class="btn btn-sm"
+                  onclick="navigator.clipboard.writeText('<%= t['WordPress Password'] %>')">Copy</button>
+        </div>
+      </div>
+      <% } %>
     </div>
   </div>
 </div>
 <% } %>
 
+<!-- =================== Database & server =================== -->
+<% if (t['DB Host'] || t['Site Root']) { %>
 <div class="card">
-  <div class="card-header"><h3><%= __('sites.rawInfo') %></h3></div>
+  <div class="card-header"><h3><%= __('sites.dbInfo') %></h3></div>
   <div class="card-body">
-    <pre><%= typeof eeInfo === 'string' ? eeInfo : JSON.stringify(eeInfo, null, 2) %></pre>
+    <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+      <% if (t['Site Root']) { %>
+      <div style="grid-column: 1 / -1;">
+        <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:.08em; font-weight:600; margin-bottom:4px;"><%= __('sites.siteRoot') %></div>
+        <div class="code" style="display:inline-block;"><%= t['Site Root'] %></div>
+      </div>
+      <% } %>
+      <% if (t['DB Host']) { %>
+      <div>
+        <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:.08em; font-weight:600; margin-bottom:4px;"><%= __('sites.dbHost') %></div>
+        <div class="code" style="display:inline-block;"><%= t['DB Host'] %></div>
+      </div>
+      <% } %>
+      <% if (t['DB Name']) { %>
+      <div>
+        <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:.08em; font-weight:600; margin-bottom:4px;"><%= __('sites.dbName') %></div>
+        <div class="code" style="display:inline-block;"><%= t['DB Name'] %></div>
+      </div>
+      <% } %>
+      <% if (t['DB User']) { %>
+      <div>
+        <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:.08em; font-weight:600; margin-bottom:4px;"><%= __('sites.dbUser') %></div>
+        <div class="code" style="display:inline-block;"><%= t['DB User'] %></div>
+      </div>
+      <% } %>
+      <% if (t['DB Password']) { %>
+      <div>
+        <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:.08em; font-weight:600; margin-bottom:4px;"><%= __('sites.dbPassword') %></div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span class="code" style="display:inline-block; cursor:pointer; user-select:none;"
+                data-secret="<%= t['DB Password'] %>"
+                onclick="this.textContent = this.getAttribute('data-secret'); this.style.cursor='text';">
+            ••••••••••••
+          </span>
+          <button type="button" class="btn btn-sm"
+                  onclick="navigator.clipboard.writeText('<%= t['DB Password'] %>')">Copy</button>
+        </div>
+      </div>
+      <% } %>
+      <% if (t['Alias Domains']) { %>
+      <div style="grid-column: 1 / -1;">
+        <div class="muted" style="font-size:11px; text-transform:uppercase; letter-spacing:.08em; font-weight:600; margin-bottom:4px;"><%= __('sites.aliasDomains') %></div>
+        <div><%= t['Alias Domains'] %></div>
+      </div>
+      <% } %>
+    </div>
   </div>
 </div>
+<% } %>
+
+<!-- =================== Recent activity =================== -->
+<div class="card">
+  <div class="card-header"><h3><%= __('sites.activity') %></h3></div>
+  <% if (!recentLogs.length) { %>
+    <div class="empty"><%= __('sites.noActivity') %></div>
+  <% } else { %>
+  <table class="table">
+    <thead>
+      <tr>
+        <th><%= __('logs.time') %></th>
+        <th><%= __('logs.level') %></th>
+        <th><%= __('logs.category') %></th>
+        <th><%= __('logs.message') %></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% recentLogs.forEach(function(l){ %>
+      <tr>
+        <td class="muted" style="font-size:12.5px; white-space:nowrap;"><%= l.created_at %></td>
+        <td>
+          <span class="tag <%= l.level === 'error' ? 'tag-red' : (l.level === 'warn' ? 'tag-yellow' : (l.level === 'info' ? 'tag-blue' : '')) %>">
+            <%= l.level %>
+          </span>
+        </td>
+        <td><%= l.category %></td>
+        <td style="font-size:13px; max-width:60ch; overflow:hidden; text-overflow:ellipsis;" title="<%= l.message %>"><%= l.message %></td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</div>
+
+<!-- =================== Raw EE output (collapsed) =================== -->
+<% if (eeInfo && eeInfo.raw) { %>
+<div class="card">
+  <div class="card-header"><h3><%= __('sites.rawInfo') %></h3></div>
+  <div class="card-body" style="padding:0;">
+    <details>
+      <summary style="cursor:pointer; padding:14px 22px; font-size:12.5px; color:var(--slate); user-select:none;">Show raw <code>ee site info</code> output</summary>
+      <pre style="margin:0; border-radius:0; border:0; border-top:1px solid var(--border);"><%= eeInfo.raw %></pre>
+    </details>
+  </div>
+</div>
+<% } %>

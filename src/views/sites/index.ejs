@@ -3,46 +3,91 @@
     <h1 class="page-title"><%= __('sites.title') %></h1>
     <p class="page-subtitle"><%= __('sites.subtitle') %></p>
   </div>
-  <a href="/sites/new" class="btn btn-primary"><%= __('sites.create') %></a>
+  <a href="/sites/new" class="btn btn-primary">+ <%= __('sites.create') %></a>
 </div>
 
 <% if (refreshError) { %>
   <div class="flash-item flash-info" style="margin-bottom:16px;">EE refresh failed: <%= refreshError %> — showing cached list.</div>
 <% } %>
 
+<div class="stats" style="margin-bottom:24px;">
+  <div class="stat">
+    <div class="stat-label"><%= __('sites.stats.total') %></div>
+    <div class="stat-value"><%= stats.total %></div>
+  </div>
+  <div class="stat">
+    <div class="stat-label"><%= __('sites.stats.active') %></div>
+    <div class="stat-value"><%= stats.active %></div>
+  </div>
+  <div class="stat">
+    <div class="stat-label"><%= __('sites.stats.configuring') %></div>
+    <div class="stat-value"><%= stats.configuring %></div>
+  </div>
+  <div class="stat">
+    <div class="stat-label"><%= __('sites.stats.ssl') %></div>
+    <div class="stat-value"><%= stats.ssl %></div>
+  </div>
+</div>
+
 <div class="card">
   <% if (!sites.length) { %>
-    <div class="empty"><%= __('sites.empty') %></div>
+    <div class="empty">
+      <div style="font-family:var(--font-serif); font-size:18px; color:var(--navy-ink); margin-bottom:6px;">No sites yet</div>
+      <div><%= __('sites.empty') %></div>
+      <div style="margin-top:14px;"><a class="btn btn-primary" href="/sites/new">+ <%= __('sites.create') %></a></div>
+    </div>
   <% } else { %>
   <table class="table">
     <thead>
       <tr>
         <th><%= __('sites.domain') %></th>
-        <th><%= __('sites.type') %></th>
         <th><%= __('sites.ssl') %></th>
         <th><%= __('sites.status') %></th>
+        <th><%= __('sites.createdAt') %></th>
         <th style="text-align:right;"><%= __('sites.actions') %></th>
       </tr>
     </thead>
     <tbody>
-      <% sites.forEach(function(s) { %>
+      <% sites.forEach(function(s) {
+           var protocol = s.ssl ? 'https' : 'http';
+           var siteUrl  = protocol + '://' + s.domain;
+           var adminUrl = siteUrl + '/wp-admin';
+      %>
       <tr>
         <td>
-          <a href="/sites/<%= encodeURIComponent(s.domain) %>"><%= s.domain %></a>
-          <% if (s.title) { %><div class="muted" style="font-size:12px;"><%= s.title %></div><% } %>
+          <% if (s.title) { %>
+            <div style="font-family:var(--font-serif); font-weight:600; color:var(--navy-ink); font-size:15px; line-height:1.3;"><%= s.title %></div>
+          <% } %>
+          <div style="font-size:13px;">
+            <a href="/sites/<%= encodeURIComponent(s.domain) %>" style="color:var(--slate); font-weight:500;"><%= s.domain %></a>
+          </div>
+          <% if (s.description) { %>
+            <div class="muted" style="font-size:12px; margin-top:2px; max-width:42ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><%= s.description %></div>
+          <% } %>
         </td>
-        <td><span class="tag tag-blue"><%= s.site_type || 'wp' %></span></td>
-        <td><%= s.ssl ? __('common.yes') : __('common.no') %></td>
         <td>
-          <% var c = (s.status === 'active') ? 'tag-green' : (s.status === 'configuring' ? 'tag-yellow' : ''); %>
+          <% if (s.ssl) { %>
+            <span class="tag tag-green" title="HTTPS · Let's Encrypt">🔒 <%= __('sites.secure') %></span>
+          <% } else { %>
+            <span class="tag tag-gray"><%= __('sites.insecure') %></span>
+          <% } %>
+        </td>
+        <td>
+          <% var c = (s.status === 'active') ? 'tag-green'
+                  : (s.status === 'configuring' ? 'tag-yellow' : 'tag-gray'); %>
           <span class="tag <%= c %>"><%= s.status || 'unknown' %></span>
+        </td>
+        <td class="muted" style="font-size:12.5px;">
+          <%= (s.created_at || '').split(' ')[0] %>
         </td>
         <td style="text-align:right;">
           <div class="row-actions" style="justify-content:flex-end;">
-            <a href="/sites/<%= encodeURIComponent(s.domain) %>" class="btn btn-sm"><%= __('sites.view') %></a>
+            <a href="/sites/<%= encodeURIComponent(s.domain) %>" class="btn btn-sm" title="<%= __('sites.view') %>"><%= __('sites.view') %></a>
+            <a href="<%= siteUrl %>" target="_blank" rel="noopener" class="btn btn-sm" title="<%= __('sites.visit') %>">↗ <%= __('sites.visit') %></a>
+            <a href="<%= adminUrl %>" target="_blank" rel="noopener" class="btn btn-sm" title="<%= __('sites.wpAdmin') %>">WP</a>
             <form method="post" action="/sites/<%= encodeURIComponent(s.domain) %>/delete"
-                  onsubmit="return confirm('<%= __('sites.confirmDelete') %>')">
-              <button class="btn btn-sm btn-danger" type="submit"><%= __('sites.delete') %></button>
+                  onsubmit="return confirm('<%= __('sites.confirmDelete') %>')" style="display:inline;">
+              <button class="btn btn-sm btn-danger" type="submit" title="<%= __('sites.delete') %>">×</button>
             </form>
           </div>
         </td>

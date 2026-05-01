@@ -68,4 +68,24 @@ function distinctCategories() {
     .map((r) => r.category);
 }
 
-module.exports = { write, list, count, distinctCategories };
+/**
+ * Find logs that mention a particular needle (e.g. a domain) anywhere in the
+ * message or meta payload. Used by the Site detail page to surface a per-site
+ * activity timeline.
+ */
+function searchByMessage(needle, limit = 30) {
+  if (!needle || typeof needle !== 'string') return [];
+  const like = `%${needle}%`;
+  return getDb()
+    .prepare(
+      `SELECT l.*, u.username AS user_name
+         FROM logs l
+         LEFT JOIN users u ON u.id = l.user_id
+        WHERE l.message LIKE ? OR l.meta_json LIKE ?
+        ORDER BY l.created_at DESC, l.id DESC
+        LIMIT ?`
+    )
+    .all(like, like, limit);
+}
+
+module.exports = { write, list, count, distinctCategories, searchByMessage };
