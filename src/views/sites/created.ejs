@@ -13,6 +13,14 @@
   <%= __('sites.created', { domain: site.domain }) %>
 </div>
 
+<% if (cfg.warnings && cfg.warnings.length) { %>
+  <div style="margin-bottom:14px;">
+    <% cfg.warnings.forEach(function(w) { %>
+      <div class="flash-item flash-warning" style="margin-bottom:6px;">⚠ <%= w %></div>
+    <% }) %>
+  </div>
+<% } %>
+
 <div class="card">
   <div class="card-header">
     <h3><%= __('sites.adminCredentials') %></h3>
@@ -69,18 +77,6 @@
             → <span class="tag tag-green"><%= cfg.menuLocation %></span>
           <% } else { %>
             <span class="muted" style="font-size:12px;">(<%= __('sites.menuNotAssigned') %>)</span>
-          <% } %>
-          <% if (cfg.isBlockTheme) { %>
-            <div style="margin-top:6px;">
-              <span class="tag tag-pink">Block theme (FSE)</span>
-              <% if (cfg.blockNavigation && cfg.blockNavigation.ids && cfg.blockNavigation.ids.length) { %>
-                <span class="muted" style="font-size:12px;">
-                  wp_navigation
-                  <%= cfg.blockNavigation.created ? 'created' : 'updated' %>:
-                  #<%= cfg.blockNavigation.ids.join(', #') %>
-                </span>
-              <% } %>
-            </div>
           <% } %>
         </div>
       </div>

@@ -40,7 +40,7 @@ function buildWpCommand(wpArgv) {
 // ---------------------------------------------------------------------------
 async function wp(domain, wpArgv, opts = {}) {
   v.assertDomain(domain);
-  if (!Array.isArray(wpArgv) || !wpArgv.length) {
+  if (\!Array.isArray(wpArgv) || \!wpArgv.length) {
     throw new Error('wpArgv must be a non-empty array');
   }
   const command = buildWpCommand(wpArgv);
@@ -118,7 +118,7 @@ function isHarmlessActivateNoop(stderr) {
 async function installTheme(domain, slug, { activate = true } = {}) {
   // 1) install (tolerant of "already installed")
   const inst = await wpSoft(domain, ['theme', 'install', slug]);
-  if (inst.code !== 0 && !isHarmlessInstallNoop(inst.stderr)) {
+  if (inst.code \!== 0 && \!isHarmlessInstallNoop(inst.stderr)) {
     const err = new Error(`theme install ${slug} failed: ${(inst.stderr || inst.stdout).trim()}`);
     err.result = inst; throw err;
   }
@@ -126,7 +126,7 @@ async function installTheme(domain, slug, { activate = true } = {}) {
   // 2) activate (tolerant of "already active")
   if (activate) {
     const act = await wpSoft(domain, ['theme', 'activate', slug]);
-    if (act.code !== 0 && !isHarmlessActivateNoop(act.stderr)) {
+    if (act.code \!== 0 && \!isHarmlessActivateNoop(act.stderr)) {
       const err = new Error(`theme activate ${slug} failed: ${(act.stderr || act.stdout).trim()}`);
       err.result = act; throw err;
     }
@@ -140,20 +140,20 @@ async function installTheme(domain, slug, { activate = true } = {}) {
  * runs even when the plugin folder already exists.
  */
 async function installPlugins(domain, slugs, { activate = true } = {}) {
-  if (!Array.isArray(slugs) || !slugs.length) return [];
+  if (\!Array.isArray(slugs) || \!slugs.length) return [];
   const results = [];
   for (const slug of slugs) {
     const inst = await wpSoft(domain, ['plugin', 'install', slug]);
     const installOk = inst.code === 0 || isHarmlessInstallNoop(inst.stderr);
-    if (!installOk) {
+    if (\!installOk) {
       results.push({ slug, ok: false, error: (inst.stderr || inst.stdout).trim() });
       continue;
     }
-    if (!activate) { results.push({ slug, ok: true }); continue; }
+    if (\!activate) { results.push({ slug, ok: true }); continue; }
 
     const act = await wpSoft(domain, ['plugin', 'activate', slug]);
     const activateOk = act.code === 0 || isHarmlessActivateNoop(act.stderr);
-    if (!activateOk) {
+    if (\!activateOk) {
       results.push({ slug, ok: false, error: (act.stderr || act.stdout).trim() });
     } else {
       results.push({ slug, ok: true });
@@ -166,7 +166,7 @@ async function installPlugins(domain, slugs, { activate = true } = {}) {
 // Categories + pages (idempotent)
 // ---------------------------------------------------------------------------
 async function ensureCategory(domain, name) {
-  if (!name) return null;
+  if (\!name) return null;
   const r = await wpSoft(domain, ['term', 'create', 'category', name, '--porcelain']);
   return r.stdout.trim();
 }
@@ -174,8 +174,8 @@ async function ensureCategory(domain, name) {
 async function findPageBySlug(domain, slug) {
   const r = await wp(domain, ['post', 'list', '--post_type=page', `--name=${slug}`, '--field=ID']);
   const lines = r.stdout.trim().split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  if (!lines.length) return null;
-  // wp-cli sometimes prints a leading "Success: …" line — take the last numeric line.
+  if (\!lines.length) return null;
+  // wp-cli sometimes prints a leading "Success: ..." line — take the last numeric line.
   const last = lines[lines.length - 1];
   const id = parseInt(last, 10);
   return Number.isFinite(id) ? id : null;
@@ -253,110 +253,8 @@ async function getFirstMenuLocation(domain) {
 }
 
 async function assignMenuToLocation(domain, menuName, location) {
-  if (!location) return null;
+  if (\!location) return null;
   return wp(domain, ['menu', 'location', 'assign', menuName, location]);
-}
-
-// ---------------------------------------------------------------------------
-// Block theme (Full Site Editing) navigation
-//
-// Block themes do not render classic `wp_menu` items — their header template
-// part contains a `<!-- wp:navigation /-->` block that references a
-// `wp_navigation` post type. To populate the visible navigation we either:
-//   (a) update every existing wp_navigation post with our links (covers the
-//       case where the theme already shipped one and the template refs it),
-//   (b) create a new wp_navigation post when none exist (the Navigation
-//       block falls back to the most recent published wp_navigation when
-//       no explicit `ref` is set).
-// ---------------------------------------------------------------------------
-
-async function isBlockTheme(domain) {
-  const r = await wpSoft(domain, ['eval', "echo wp_is_block_theme() ? '1' : '0';"]);
-  return r.code === 0 && r.stdout.trim() === '1';
-}
-
-/**
- * Build the inner block-markup string for a wp_navigation post containing
- * one navigation-link per page.
- *
- *   <!-- wp:navigation-link {"label":"About Us","type":"page","id":42,
- *        "url":"/about-us/","kind":"post-type"} /-->
- */
-function buildNavigationLinks(pageRecords) {
-  // NB: blocks are joined with NO separator — the WP block parser doesn't
-  // need whitespace between block delimiters, and embedding actual newlines
-  // here causes our multi-layer shell quoting (panel → ssh → ee → bash → wp)
-  // to misparse on some hosts. Keeping the whole content on one line removes
-  // the failure mode entirely.
-  return pageRecords.map((p) => {
-    const json = JSON.stringify({
-      label: p.menuTitle,
-      type: 'page',
-      id: p.id,
-      kind: 'post-type',
-      url: `/${p.slug}/`
-    });
-    return `<!-- wp:navigation-link ${json} /-->`;
-  }).join('');
-}
-
-async function configureBlockNavigation(domain, pageRecords, menuName) {
-  if (!Array.isArray(pageRecords) || pageRecords.length === 0) return null;
-
-  const content = buildNavigationLinks(pageRecords);
-  const contentB64 = Buffer.from(content, 'utf8').toString('base64');
-  const titleB64   = Buffer.from(String(menuName || 'Main Menu'), 'utf8').toString('base64');
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // Why this is wrapped in eval(base64_decode(...)) instead of just sent as
-  // PHP code:
-  //
-  //   The string that reaches `wp eval` travels through:
-  //     panel → ssh → host wrapper (bash -c "/usr/local/bin/ee $ARGS")
-  //          → ee binary → docker exec → inner shell → wp-cli → PHP eval
-  //
-  //   The host wrapper's `bash -c "...$ARGS"` does parameter expansion ONCE
-  //   on the substituted value. If $ARGS contains literal `$c=...` PHP
-  //   variable names, bash treats them as undefined shell variables and
-  //   silently expands them to empty strings — PHP then sees `=base64_decode(...)`
-  //   and fails to parse.
-  //
-  //   By base64-encoding the inner PHP body and only emitting the outer
-  //   wrapper `eval(base64_decode("..."));`, the string the shell touches
-  //   contains ZERO `$` characters and ZERO single quotes. Nothing to
-  //   accidentally expand, nothing to break the quoting.
-  // ─────────────────────────────────────────────────────────────────────────
-  const phpInner = (
-    'error_reporting(E_ERROR);' + // squelch the wp_actionscheduler_actions warnings during boot
-    '$c=base64_decode("' + contentB64 + '");' +
-    '$t=base64_decode("' + titleB64   + '");' +
-    '$existing=get_posts(["post_type"=>"wp_navigation","post_status"=>"any","posts_per_page"=>50,"orderby"=>"date","order"=>"ASC"]);' +
-    '$ids=[];' +
-    'if($existing){' +
-      'foreach($existing as $p){' +
-        'wp_update_post(["ID"=>$p->ID,"post_title"=>$t,"post_content"=>$c,"post_status"=>"publish"]);' +
-        '$ids[]=$p->ID;' +
-      '}' +
-    '}else{' +
-      '$id=wp_insert_post(["post_type"=>"wp_navigation","post_status"=>"publish","post_title"=>$t,"post_content"=>$c]);' +
-      'if($id){$ids[]=$id;}' +
-    '}' +
-    'echo json_encode(["ids"=>$ids,"created"=>empty($existing)]);'
-  );
-
-  const phpInnerB64 = Buffer.from(phpInner, 'utf8').toString('base64');
-  const phpOuter = `eval(base64_decode("${phpInnerB64}"));`;
-
-  const r = await wp(domain, ['eval', phpOuter]);
-  const out = (r.stdout || '').trim();
-
-  // Be tolerant — there may be PHP warnings/notices before the final JSON
-  // (the action-scheduler tables can still produce DB errors during boot).
-  const m = out.match(/\{[\s\S]*\}\s*$/);
-  if (m) {
-    try { return JSON.parse(m[0]); } catch (_) { /* fall through */ }
-  }
-  return { ids: [], created: false, raw: out };
 }
 
 // ---------------------------------------------------------------------------
@@ -384,6 +282,9 @@ async function getAdminPassword(domain) {
  * Configure a brand-new (or already-existing) WordPress site according to
  * the persisted siteTemplate. Idempotent: safe to re-run.
  *
+ * Steps: site options → theme → plugins → pages → menu (best-effort).
+ * Menu failures are collected as warnings and never block the result.
+ *
  * @param {string} domain
  * @param {{ title?: string, description?: string, category?: string }} opts
  * @returns {Promise<object>}  summary of work done
@@ -393,24 +294,25 @@ async function configureNewSite(domain, opts = {}) {
   const websiteName = opts.title || domain;
   const description = opts.description || '';
   const vars = { domain, websiteName, description };
+  const warnings = [];
 
   // 1) Site identity + global options
   await setSiteOptions(domain, { title: websiteName, description });
   await applyOptionMap(domain, tpl.options || {});
 
-  // 2) Theme
+  // 2) Theme — install then activate
   await installTheme(domain, tpl.theme, { activate: true });
 
-  // 3) Plugins
+  // 3) Plugins — install + activate one-by-one
   const pluginResults = await installPlugins(domain, tpl.plugins || [], { activate: true });
 
   // 4) Default category
   if (opts.category) await ensureCategory(domain, opts.category);
 
-  // 5) Pages with placeholder substitution + slug-based idempotency
+  // 5) Pages — placeholder substitution + slug-based idempotency
   const pageRecords = [];
   for (const page of tpl.pages || []) {
-    const renderedTitle = siteTemplate.applyTemplate(page.title, vars);
+    const renderedTitle   = siteTemplate.applyTemplate(page.title, vars);
     const renderedContent = siteTemplate.applyTemplate(page.content, vars);
     const id = await createOrUpdatePage(domain, {
       slug: page.slug,
@@ -426,35 +328,30 @@ async function configureNewSite(domain, opts = {}) {
     }
   }
 
-  // 6) Classic menu — always created (visible in Appearance > Menus and used
-  //    by classic themes). Idempotent via delete-then-create.
+  // 6) Menu — best-effort: create menu + add pages + assign to first theme
+  //    location. Any failure is recorded as a warning; it never blocks the
+  //    rest of site setup.
   const menuName = tpl.menuName || 'Main Menu';
-  await deleteMenuByName(domain, menuName);
-  const menuId = await createMenu(domain, menuName);
-  for (const p of pageRecords) {
-    await addItemToMenu(domain, menuName, p.id, p.menuTitle);
-  }
+  let menuId = null;
+  let menuLocation = null;
 
-  // 7) Auto-detect theme's primary menu location (classic themes only) and
-  //    assign the menu there.
-  const menuLocation = await getFirstMenuLocation(domain);
-  if (menuLocation) {
-    await assignMenuToLocation(domain, menuName, menuLocation);
-  }
-
-  // 7b) Block theme (FSE) navigation — populate the wp_navigation post(s)
-  //     so the Navigation block in the theme's header template renders our
-  //     pages instead of the empty "#" placeholders.
-  let blockTheme = false;
-  let blockNavigation = null;
   try {
-    blockTheme = await isBlockTheme(domain);
-  } catch (_) { /* fallback to classic */ }
-  if (blockTheme) {
-    blockNavigation = await configureBlockNavigation(domain, pageRecords, menuName);
+    await deleteMenuByName(domain, menuName);
+    menuId = await createMenu(domain, menuName);
+    for (const p of pageRecords) {
+      await addItemToMenu(domain, menuName, p.id, p.menuTitle);
+    }
+    menuLocation = await getFirstMenuLocation(domain);
+    if (menuLocation) {
+      await assignMenuToLocation(domain, menuName, menuLocation);
+    } else {
+      warnings.push('No menu location found in theme — menu created but not assigned to a location.');
+    }
+  } catch (menuErr) {
+    warnings.push(`Menu setup skipped: ${menuErr.message}`);
   }
 
-  // 8) Caches
+  // 7) Caches
   await flushCache(domain).catch(() => {});
   await flushRewrite(domain);
 
@@ -465,8 +362,7 @@ async function configureNewSite(domain, opts = {}) {
     menuName,
     menuId,
     menuLocation: menuLocation || null,
-    isBlockTheme: blockTheme,
-    blockNavigation
+    warnings
   };
 }
 
@@ -486,8 +382,6 @@ module.exports = {
   addItemToMenu,
   getFirstMenuLocation,
   assignMenuToLocation,
-  isBlockTheme,
-  configureBlockNavigation,
   flushRewrite,
   flushCache,
   getSiteUrl,
