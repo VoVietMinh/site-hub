@@ -302,46 +302,48 @@ function buildNavigationLinks(pageRecords) {
 
 async function configureBlockNavigation(domain, pageRecords, menuName) {
   if (!Array.isArray(pageRecords) || pageRecords.length === 0) return null;
+
   const content = buildNavigationLinks(pageRecords);
 
-  // List ALL existing wp_navigation posts (any status) so we can update
-  // whichever the theme template references.
-  const listR = await wpSoft(domain, [
-    'post', 'list',
-    '--post_type=wp_navigation',
-    '--post_status=any',
-    '--field=ID',
-    '--posts_per_page=50',
-    '--orderby=date',
-    '--order=ASC'
-  ]);
-  const ids = listR.stdout.trim().split(/\r?\n/)
-    .map((s) => s.trim())
-    .filter((s) => /^\d+$/.test(s))
-    .map(Number);
+  // Sidestep multi-layer shell quoting (panel → ssh → wrapper → ee → docker
+  // exec → bash → wp) by base64-encoding the payload. Base64 is pure
+  // [A-Za-z0-9+/=] — no shell metacharacters, no possibility of an embedded
+  // quote breaking the outer quoting. PHP decodes inside `wp eval` and does
+  // both the list-existing and create/update logic in a single call.
+  const contentB64 = Buffer.from(content, 'utf8').toString('base64');
+  const titleB64   = Buffer.from(String(menuName || 'Main Menu'), 'utf8').toString('base64');
 
-  if (ids.length > 0) {
-    for (const navId of ids) {
-      await wp(domain, [
-        'post', 'update', String(navId),
-        `--post_title=${menuName}`,
-        `--post_content=${content}`,
-        '--post_status=publish'
-      ]);
-    }
-    return { ids, created: false };
+  // PHP intentionally uses ONLY double-quoted strings so we never need a
+  // single-quote escape — that lets our outer shellQuote wrap the whole
+  // PHP body in a single pair of single quotes, producing exactly 2 `'\''`
+  // boundary sequences in the final SSH command (vs. the 4+ that broke the
+  // raw --post_content= path on this host).
+  const php = (
+    '$c=base64_decode("' + contentB64 + '");' +
+    '$t=base64_decode("' + titleB64   + '");' +
+    '$existing=get_posts(["post_type"=>"wp_navigation","post_status"=>"any","posts_per_page"=>50,"orderby"=>"date","order"=>"ASC"]);' +
+    '$ids=[];' +
+    'if($existing){' +
+      'foreach($existing as $p){' +
+        'wp_update_post(["ID"=>$p->ID,"post_title"=>$t,"post_content"=>$c,"post_status"=>"publish"]);' +
+        '$ids[]=$p->ID;' +
+      '}' +
+    '}else{' +
+      '$id=wp_insert_post(["post_type"=>"wp_navigation","post_status"=>"publish","post_title"=>$t,"post_content"=>$c]);' +
+      'if($id){$ids[]=$id;}' +
+    '}' +
+    'echo json_encode(["ids"=>$ids,"created"=>empty($existing)]);'
+  );
+
+  const r = await wp(domain, ['eval', php]);
+  const out = (r.stdout || '').trim();
+
+  // Be tolerant — wp eval may emit warnings before our JSON.
+  const m = out.match(/\{[\s\S]*\}\s*$/);
+  if (m) {
+    try { return JSON.parse(m[0]); } catch (_) { /* fall through */ }
   }
-
-  const r = await wp(domain, [
-    'post', 'create',
-    '--post_type=wp_navigation',
-    '--post_status=publish',
-    `--post_title=${menuName}`,
-    `--post_content=${content}`,
-    '--porcelain'
-  ]);
-  const navId = parseInt(r.stdout.trim(), 10);
-  return { ids: [navId], created: true };
+  return { ids: [], created: false, raw: out };
 }
 
 // ---------------------------------------------------------------------------
