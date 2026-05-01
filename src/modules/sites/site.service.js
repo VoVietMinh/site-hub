@@ -81,15 +81,33 @@ async function createFull({
   });
 
   // 1) ee site create — also passes --cache, --title, admin-* (matches bash script)
-  await ee.createSite(domain, {
-    type: 'wp',
-    cache: true,
-    ssl,
-    title: siteTitle,
-    adminUser: finalAdminUser,
-    adminPass: finalAdminPass,
-    adminEmail: finalAdminEmail
-  });
+  try {
+    await ee.createSite(domain, {
+      type: 'wp',
+      cache: true,
+      ssl,
+      title: siteTitle,
+      adminUser: finalAdminUser,
+      adminPass: finalAdminPass,
+      adminEmail: finalAdminEmail
+    });
+  } catch (err) {
+    // Friendlier message for the most common cause: LE certificate-rate-limit.
+    // EasyEngine rolls back the whole site when SSL acquisition fails, so the
+    // user needs to know to either wait, change subdomain, or skip SSL.
+    const txt = (err && err.message) || '';
+    if (/rateLimited|too many certificates/i.test(txt)) {
+      const friendly = new Error(
+        `Let's Encrypt rate limit hit for "${domain}" (5 certs / 7 days per exact ` +
+        `domain set). EasyEngine rolled the site back. Re-create WITHOUT SSL ` +
+        `and add it later with \`ee site update ${domain} --ssl=le\`, OR use a ` +
+        `different subdomain. Original: ${txt}`
+      );
+      friendly.cause = err;
+      throw friendly;
+    }
+    throw err;
+  }
 
   // Persist a record immediately so the UI shows progress.
   repo.upsert({
