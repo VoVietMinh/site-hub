@@ -103,35 +103,60 @@ async function applyOptionMap(domain, options = {}) {
  * stays idempotent.
  */
 function isHarmlessInstallNoop(stderr) {
-  return /already installed|already active|destination folder already exists/i
-    .test(stderr || '');
+  return /already installed|destination folder already exists/i.test(stderr || '');
+}
+function isHarmlessActivateNoop(stderr) {
+  return /already active/i.test(stderr || '');
 }
 
+/**
+ * Install + activate as two separate steps. Combining them with
+ * `--activate` skips activation when the install short-circuits because the
+ * folder already exists, which is exactly the case where activation matters
+ * most (re-running create on an existing site).
+ */
 async function installTheme(domain, slug, { activate = true } = {}) {
-  const args = ['theme', 'install', slug];
-  if (activate) args.push('--activate');
-  const r = await wpSoft(domain, args);
-  if (r.code !== 0 && !isHarmlessInstallNoop(r.stderr)) {
-    const err = new Error(`theme install ${slug} failed: ${(r.stderr || r.stdout).trim()}`);
-    err.result = r; throw err;
+  // 1) install (tolerant of "already installed")
+  const inst = await wpSoft(domain, ['theme', 'install', slug]);
+  if (inst.code !== 0 && !isHarmlessInstallNoop(inst.stderr)) {
+    const err = new Error(`theme install ${slug} failed: ${(inst.stderr || inst.stdout).trim()}`);
+    err.result = inst; throw err;
   }
-  return r;
+
+  // 2) activate (tolerant of "already active")
+  if (activate) {
+    const act = await wpSoft(domain, ['theme', 'activate', slug]);
+    if (act.code !== 0 && !isHarmlessActivateNoop(act.stderr)) {
+      const err = new Error(`theme activate ${slug} failed: ${(act.stderr || act.stdout).trim()}`);
+      err.result = act; throw err;
+    }
+  }
+  return { installed: inst, activated: activate };
 }
 
 /**
  * Install plugins one-at-a-time so a single bad slug doesn't abort the rest.
+ * Like installTheme, install and activate are separate steps so activation
+ * runs even when the plugin folder already exists.
  */
 async function installPlugins(domain, slugs, { activate = true } = {}) {
   if (!Array.isArray(slugs) || !slugs.length) return [];
   const results = [];
   for (const slug of slugs) {
-    const args = ['plugin', 'install', slug];
-    if (activate) args.push('--activate');
-    const r = await wpSoft(domain, args);
-    if (r.code === 0 || isHarmlessInstallNoop(r.stderr)) {
-      results.push({ slug, ok: true });
+    const inst = await wpSoft(domain, ['plugin', 'install', slug]);
+    const installOk = inst.code === 0 || isHarmlessInstallNoop(inst.stderr);
+    if (!installOk) {
+      results.push({ slug, ok: false, error: (inst.stderr || inst.stdout).trim() });
+      continue;
+    }
+    if (!activate) { results.push({ slug, ok: true }); continue; }
+
+    const act = await wpSoft(domain, ['plugin', 'activate', slug]);
+    const activateOk = act.code === 0 || isHarmlessActivateNoop(act.stderr);
+    if (!activateOk) {
+      results.push({ slug, ok: false, error: (act.stderr || act.stdout).trim() });
     } else {
-      results.push({ slug, ok: false, error: (r.stderr || r.stdout).trim() });
+      results.push({ slug, ok: true });
     }
   }
   return results;
