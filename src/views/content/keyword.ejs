@@ -1,3 +1,18 @@
+<link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
+<style>
+.ql-container { font-size: 14px; min-height: 420px; }
+.ql-toolbar { border-radius: 6px 6px 0 0; }
+.ql-container { border-radius: 0 0 6px 6px; }
+.editor-tabs { display: flex; gap: 0; margin-bottom: -1px; position: relative; z-index: 1; }
+.editor-tab { padding: 6px 16px; font-size: 13px; cursor: pointer; border: 1px solid #e5e7eb;
+              border-bottom: none; border-radius: 6px 6px 0 0; background: #f9fafb; color: #6b7280; }
+.editor-tab.active { background: #fff; color: #111827; font-weight: 600; }
+#html-source { display: none; width: 100%; box-sizing: border-box;
+               font-family: monospace; font-size: 12px; line-height: 1.5;
+               min-height: 460px; border: 1px solid #e5e7eb; border-radius: 0 0 6px 6px;
+               padding: 12px; resize: vertical; }
+</style>
+
 <div class="page-header">
   <div>
     <h1 class="page-title"><%= keyword.keyword %></h1>
@@ -21,7 +36,7 @@
 <div class="card">
   <div class="card-header"><h3>Edit Content</h3></div>
   <div class="card-body">
-    <form method="post" action="/content/<%= job.id %>/keywords/<%= keyword.id %>">
+    <form id="kw-form" method="post" action="/content/<%= job.id %>/keywords/<%= keyword.id %>">
       <input type="hidden" name="_return" value="keyword" />
 
       <div class="form-row">
@@ -29,29 +44,40 @@
         <input type="text" id="kw-title" name="title" value="<%= keyword.title || '' %>" style="width:100%;" />
       </div>
 
+      <\!-- ── HTML Editor ───────────────────────────────────────────────── -->
       <div class="form-row" style="margin-top:14px;">
-        <label for="kw-content">Content <span class="muted" style="font-weight:400;">(HTML)</span></label>
-        <textarea id="kw-content" name="content" rows="22" style="width:100%;font-family:monospace;font-size:12px;line-height:1.5;"><%= keyword.content || '' %></textarea>
+        <label>Content</label>
+        <div class="editor-tabs">
+          <div class="editor-tab active" id="tab-visual" onclick="switchTab('visual')">Visual</div>
+          <div class="editor-tab" id="tab-html" onclick="switchTab('html')">HTML Source</div>
+        </div>
+        <div id="quill-editor"></div>
+        <textarea id="html-source" spellcheck="false"></textarea>
+        <\!-- Hidden field that gets synced to Quill HTML on submit -->
+        <input type="hidden" id="kw-content" name="content" />
       </div>
 
+      <\!-- ── Meta row ──────────────────────────────────────────────────── -->
       <div style="display:flex;gap:16px;margin-top:14px;flex-wrap:wrap;">
 
-        <\!-- Category — dynamic select loaded from WP API -->
-        <div class="form-row" style="flex:1;min-width:220px;">
+        <\!-- Category with live WP API select -->
+        <div class="form-row" style="flex:2;min-width:220px;">
           <label for="kw-category">Category</label>
           <div style="display:flex;gap:6px;align-items:center;">
             <select id="kw-category" name="category" style="flex:1;" data-current="<%= keyword.category || '' %>">
-              <option value="<%= keyword.category || '' %>"><%= keyword.category || '— select or type below —' %></option>
+              <option value="<%= keyword.category || '' %>"><%= keyword.category || '— loading…' %></option>
             </select>
-            <span id="cat-loading" class="muted" style="font-size:12px;">loading…</span>
+            <button type="button" class="btn btn-sm" onclick="loadCategories()" title="Refresh categories">↻</button>
+            <span id="cat-status" class="muted" style="font-size:12px;display:none;"></span>
           </div>
           <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
-            <input type="text" id="kw-category-new" placeholder="Or type a new category name…"
-                   style="flex:1;font-size:13px;"
-                   oninput="document.getElementById('kw-category').value = this.value" />
-            <button type="button" class="btn btn-sm" onclick="loadCategories()">↻</button>
+            <input type="text" id="kw-cat-new" placeholder="Or type a new category name…"
+                   style="flex:1;font-size:13px;" autocomplete="off"
+                   oninput="syncCatSelect(this.value)" />
           </div>
-          <p class="muted" style="font-size:11px;margin:4px 0 0;">Selecting from the list OR typing a new name both work. New categories are created automatically on publish.</p>
+          <p class="muted" style="font-size:11px;margin:4px 0 0;">
+            Select an existing category or type a new name — it will be created automatically on publish.
+          </p>
         </div>
 
         <div class="form-row" style="flex:1;min-width:160px;">
@@ -67,7 +93,6 @@
           <label for="kw-tone">Tone</label>
           <input type="text" id="kw-tone" name="tone" value="<%= keyword.tone || '' %>" style="width:100%;" />
         </div>
-
       </div>
 
       <div class="form-actions" style="margin-top:16px;">
@@ -81,7 +106,7 @@
 <div class="card" style="margin-top:16px;">
   <div class="card-header"><h3>Publish to WordPress</h3></div>
   <div class="card-body">
-    <p class="muted" style="margin:0 0 12px;">Save any edits first, then click Publish to push this post via the WordPress REST API.</p>
+    <p class="muted" style="margin:0 0 12px;">Save any edits first, then publish via the WordPress REST API.</p>
     <form method="post" action="/content/<%= job.id %>/keywords/<%= keyword.id %>/publish">
       <button type="submit" class="btn btn-primary">Publish Now</button>
     </form>
@@ -100,10 +125,7 @@
 <% } %>
 
 <% if (keyword.images_json) { %>
-<%
-  var _imgs = [];
-  try { _imgs = JSON.parse(keyword.images_json); } catch (e) {}
-%>
+<% var _imgs = []; try { _imgs = JSON.parse(keyword.images_json); } catch(e) {} %>
 <% if (_imgs.length) { %>
 <div class="card" style="margin-top:16px;">
   <div class="card-header"><h3>Image Suggestions (<%= _imgs.length %>)</h3></div>
@@ -114,7 +136,10 @@
         <img src="<%= img.url %>" alt="<%= img.title || '' %>"
              style="width:100%;height:120px;object-fit:cover;border-radius:4px;border:1px solid #e5e7eb;"
              onerror="this.parentNode.style.display='none'" />
-        <% if (img.title) { %><p style="font-size:11px;color:#6b7280;margin:4px 0 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" title="<%= img.title %>"><%= img.title %></p><% } %>
+        <% if (img.title) { %>
+          <p style="font-size:11px;color:#6b7280;margin:4px 0 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;"
+             title="<%= img.title %>"><%= img.title %></p>
+        <% } %>
       </div>
       <% }); %>
     </div>
@@ -123,50 +148,123 @@
 <% } %>
 <% } %>
 
+<script src="https://cdn.quilljs.com/1.3.7/quill.js"></script>
 <script>
 (function () {
-  var JOB_ID   = <%= job.id %>;
-  var catSelect = document.getElementById('kw-category');
-  var catInput  = document.getElementById('kw-category-new');
-  var catLoader = document.getElementById('cat-loading');
-  var current   = catSelect.getAttribute('data-current') || '';
+  var JOB_ID = <%= job.id %>;
+
+  // ── Quill setup ──────────────────────────────────────────────────────────
+  var quill = new Quill('#quill-editor', {
+    theme: 'snow',
+    modules: {
+      toolbar: [
+        [{ header: [1, 2, 3, 4, false] }],
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        [{ indent: '-1' }, { indent: '+1' }],
+        ['link', 'blockquote', 'code-block'],
+        ['clean']
+      ]
+    }
+  });
+
+  // Load existing HTML content into Quill
+  var initialHtml = document.getElementById('kw-content').value ||
+                    <%= JSON.stringify(keyword.content || '') %>;
+  if (initialHtml) {
+    quill.clipboard.dangerouslyPasteHTML(initialHtml);
+  }
+
+  // Keep HTML source textarea in sync (but hidden by default)
+  var htmlSource = document.getElementById('html-source');
+  htmlSource.value = initialHtml;
+
+  // ── Tab switching ─────────────────────────────────────────────────────────
+  var currentTab = 'visual';
+
+  function switchTab(tab) {
+    if (tab === currentTab) return;
+    if (tab === 'html') {
+      // Flush Quill → textarea
+      htmlSource.value = quill.root.innerHTML;
+      document.getElementById('quill-editor').style.display = 'none';
+      document.querySelector('.ql-toolbar').style.display = 'none';
+      htmlSource.style.display = 'block';
+      document.getElementById('tab-visual').classList.remove('active');
+      document.getElementById('tab-html').classList.add('active');
+    } else {
+      // Flush textarea → Quill
+      quill.clipboard.dangerouslyPasteHTML(htmlSource.value);
+      htmlSource.style.display = 'none';
+      document.getElementById('quill-editor').style.display = 'block';
+      document.querySelector('.ql-toolbar').style.display = 'block';
+      document.getElementById('tab-html').classList.remove('active');
+      document.getElementById('tab-visual').classList.add('active');
+    }
+    currentTab = tab;
+  }
+
+  // ── Form submit — sync content to hidden field ────────────────────────────
+  document.getElementById('kw-form').addEventListener('submit', function () {
+    var html = currentTab === 'html' ? htmlSource.value : quill.root.innerHTML;
+    document.getElementById('kw-content').value = html;
+  });
+
+  // ── Category loading ──────────────────────────────────────────────────────
+  var catSelect  = document.getElementById('kw-category');
+  var catNewInput = document.getElementById('kw-cat-new');
+  var catStatus   = document.getElementById('cat-status');
+  var currentCat  = catSelect.getAttribute('data-current') || '';
+
+  function syncCatSelect(val) {
+    catSelect.value = val;
+    // If val doesn't match any option, add a temporary one
+    var exists = Array.from(catSelect.options).some(function(o) { return o.value === val; });
+    if (\!exists && val) {
+      var opt = document.createElement('option');
+      opt.value = val; opt.textContent = val + ' (new)';
+      catSelect.appendChild(opt);
+      catSelect.value = val;
+    }
+  }
+
+  catSelect.addEventListener('change', function () {
+    catNewInput.value = catSelect.value;
+  });
 
   function loadCategories() {
-    catLoader.textContent = 'loading\u2026';
-    catLoader.style.display = '';
+    catStatus.textContent = 'loading\u2026'; catStatus.style.display = '';
     fetch('/content/' + JOB_ID + '/categories')
       .then(function (r) { return r.json(); })
       .then(function (data) {
         var cats = data.categories || [];
-        catLoader.style.display = 'none';
-        // Rebuild options
+        catStatus.style.display = 'none';
+        var prev = catSelect.value || currentCat;
         catSelect.innerHTML = '<option value="">— none —</option>';
         cats.forEach(function (c) {
           var opt = document.createElement('option');
           opt.value = c.name;
-          opt.textContent = c.name + (c.slug \!== c.name.toLowerCase().replace(/\s+/g, '-') ? ' (' + c.slug + ')' : '');
-          if (c.name === current || c.name.toLowerCase() === current.toLowerCase()) {
-            opt.selected = true;
-          }
+          opt.textContent = c.name;
+          if (c.name === prev || c.name.toLowerCase() === prev.toLowerCase()) opt.selected = true;
           catSelect.appendChild(opt);
         });
+        if (\!cats.find(function(c) { return c.name === prev; }) && prev) {
+          var opt = document.createElement('option');
+          opt.value = prev; opt.textContent = prev + ' (new)'; opt.selected = true;
+          catSelect.appendChild(opt);
+        }
+        catNewInput.value = catSelect.value;
         if (\!cats.length) {
-          catLoader.textContent = 'No categories found — type a new name below.';
-          catLoader.style.display = '';
+          catStatus.textContent = 'No categories yet \u2014 type a new name below.';
+          catStatus.style.display = '';
         }
       })
       .catch(function () {
-        catLoader.textContent = 'Could not load categories (site credentials may not be set).';
-        catLoader.style.display = '';
+        catStatus.textContent = 'Could not load \u2014 check site credentials.';
+        catStatus.style.display = '';
       });
   }
 
-  // Sync text input when select changes
-  catSelect.addEventListener('change', function () {
-    catInput.value = catSelect.value;
-  });
-
-  // Load on page open
   loadCategories();
 }());
 </script>
