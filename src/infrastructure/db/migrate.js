@@ -4,11 +4,11 @@
  * Idempotent schema migration. Safe to run on every boot.
  *
  * Tables:
- *   users            — accounts (super_admin / admin), bcrypt password hash
- *   sites            — local cache of sites managed via EasyEngine
- *   content_jobs     — SEO content generation jobs (one per topic batch)
- *   content_keywords — per-keyword config + status inside a job
- *   logs             — application + command audit log surfaced in the UI
+ *   users            -- accounts (super_admin / admin), bcrypt password hash
+ *   sites            -- local cache of sites managed via EasyEngine
+ *   content_jobs     -- SEO content generation jobs (one per topic batch)
+ *   content_keywords -- per-keyword config + status inside a job
+ *   logs             -- application + command audit log surfaced in the UI
  */
 
 const { getDb } = require('./connection');
@@ -86,6 +86,11 @@ function migrate() {
     CREATE INDEX IF NOT EXISTS idx_keywords_job   ON content_keywords(job_id);
     CREATE INDEX IF NOT EXISTS idx_jobs_site      ON content_jobs(site_id);
   `);
+
+  // Additive column migrations -- idempotent (SQLite throws if column already
+  // exists, so we swallow those errors).
+  try { db.exec('ALTER TABLE sites ADD COLUMN wp_user TEXT'); } catch (_) {}
+  try { db.exec('ALTER TABLE sites ADD COLUMN wp_pass TEXT'); } catch (_) {}
 
   return db;
 }

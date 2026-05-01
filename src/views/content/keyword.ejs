@@ -35,10 +35,25 @@
       </div>
 
       <div style="display:flex;gap:16px;margin-top:14px;flex-wrap:wrap;">
-        <div class="form-row" style="flex:1;min-width:180px;">
+
+        <\!-- Category — dynamic select loaded from WP API -->
+        <div class="form-row" style="flex:1;min-width:220px;">
           <label for="kw-category">Category</label>
-          <input type="text" id="kw-category" name="category" value="<%= keyword.category || '' %>" style="width:100%;" />
+          <div style="display:flex;gap:6px;align-items:center;">
+            <select id="kw-category" name="category" style="flex:1;" data-current="<%= keyword.category || '' %>">
+              <option value="<%= keyword.category || '' %>"><%= keyword.category || '— select or type below —' %></option>
+            </select>
+            <span id="cat-loading" class="muted" style="font-size:12px;">loading…</span>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
+            <input type="text" id="kw-category-new" placeholder="Or type a new category name…"
+                   style="flex:1;font-size:13px;"
+                   oninput="document.getElementById('kw-category').value = this.value" />
+            <button type="button" class="btn btn-sm" onclick="loadCategories()">↻</button>
+          </div>
+          <p class="muted" style="font-size:11px;margin:4px 0 0;">Selecting from the list OR typing a new name both work. New categories are created automatically on publish.</p>
         </div>
+
         <div class="form-row" style="flex:1;min-width:160px;">
           <label for="kw-publish-status">Publish Status</label>
           <select id="kw-publish-status" name="publish_status" style="width:100%;">
@@ -47,10 +62,12 @@
             <option value="pending" <%= keyword.publish_status === 'pending' ? 'selected' : '' %>>pending</option>
           </select>
         </div>
-        <div class="form-row" style="flex:1;min-width:120px;">
+
+        <div class="form-row" style="flex:1;min-width:160px;">
           <label for="kw-tone">Tone</label>
           <input type="text" id="kw-tone" name="tone" value="<%= keyword.tone || '' %>" style="width:100%;" />
         </div>
+
       </div>
 
       <div class="form-actions" style="margin-top:16px;">
@@ -64,7 +81,7 @@
 <div class="card" style="margin-top:16px;">
   <div class="card-header"><h3>Publish to WordPress</h3></div>
   <div class="card-body">
-    <p class="muted" style="margin:0 0 12px;">Save any edits first, then click Publish to push this post via WP-CLI.</p>
+    <p class="muted" style="margin:0 0 12px;">Save any edits first, then click Publish to push this post via the WordPress REST API.</p>
     <form method="post" action="/content/<%= job.id %>/keywords/<%= keyword.id %>/publish">
       <button type="submit" class="btn btn-primary">Publish Now</button>
     </form>
@@ -105,3 +122,51 @@
 </div>
 <% } %>
 <% } %>
+
+<script>
+(function () {
+  var JOB_ID   = <%= job.id %>;
+  var catSelect = document.getElementById('kw-category');
+  var catInput  = document.getElementById('kw-category-new');
+  var catLoader = document.getElementById('cat-loading');
+  var current   = catSelect.getAttribute('data-current') || '';
+
+  function loadCategories() {
+    catLoader.textContent = 'loading\u2026';
+    catLoader.style.display = '';
+    fetch('/content/' + JOB_ID + '/categories')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var cats = data.categories || [];
+        catLoader.style.display = 'none';
+        // Rebuild options
+        catSelect.innerHTML = '<option value="">— none —</option>';
+        cats.forEach(function (c) {
+          var opt = document.createElement('option');
+          opt.value = c.name;
+          opt.textContent = c.name + (c.slug \!== c.name.toLowerCase().replace(/\s+/g, '-') ? ' (' + c.slug + ')' : '');
+          if (c.name === current || c.name.toLowerCase() === current.toLowerCase()) {
+            opt.selected = true;
+          }
+          catSelect.appendChild(opt);
+        });
+        if (\!cats.length) {
+          catLoader.textContent = 'No categories found — type a new name below.';
+          catLoader.style.display = '';
+        }
+      })
+      .catch(function () {
+        catLoader.textContent = 'Could not load categories (site credentials may not be set).';
+        catLoader.style.display = '';
+      });
+  }
+
+  // Sync text input when select changes
+  catSelect.addEventListener('change', function () {
+    catInput.value = catSelect.value;
+  });
+
+  // Load on page open
+  loadCategories();
+}());
+</script>

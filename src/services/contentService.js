@@ -5,6 +5,7 @@
  *
  * AI provider  : Google Gemini 1.5 Flash  (AI_PROVIDER=gemini, AI_API_KEY=...)
  * Image search : Serper.dev /images API   (SERPER_API_KEY=...)
+ * WP publish   : WordPress REST API + JWT Authentication for WP-API plugin
  *
  * Falls back to mock data when keys are missing so local dev still works.
  */
@@ -20,25 +21,28 @@ function capitalize(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+function siteBase(domain, ssl) {
+  return (ssl ? 'https' : 'http') + '://' + domain;
+}
+
 /**
  * Call the Gemini 1.5 Flash generateContent endpoint and return the text.
- * Throws on HTTP error; returns null if the response shape is unexpected.
  */
 async function callGemini(prompt) {
-  const key = config.ai.apiKey;
+  var key = config.ai.apiKey;
   if (!key) return null;
 
-  const url =
+  var url =
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' +
     key;
 
-  const resp = await axios.post(
+  var resp = await axios.post(
     url,
     { contents: [{ parts: [{ text: prompt }] }] },
     { timeout: 60000 }
   );
 
-  const text =
+  var text =
     resp.data &&
     resp.data.candidates &&
     resp.data.candidates[0] &&
@@ -95,9 +99,9 @@ function mockKeywords(topic, n) {
 // 2) Outline generation
 // ---------------------------------------------------------------------------
 async function generateOutline(opts) {
-  var keyword    = opts.keyword;
+  var keyword     = opts.keyword;
   var numOutlines = opts.numOutlines || 9;
-  var tone       = opts.tone || 'natural, humanize';
+  var tone        = opts.tone || 'natural, humanize';
 
   if (config.ai.provider !== 'gemini' || !config.ai.apiKey) {
     return mockOutline(keyword, numOutlines);
@@ -212,8 +216,8 @@ async function fetchImages(opts) {
     var images = (resp.data && resp.data.images) || [];
     return images.slice(0, count).map(function(img) {
       return {
-        url: img.imageUrl || img.link || '',
-        alt: img.title || keyword
+        url:   img.imageUrl || img.link || '',
+        title: img.title || keyword
       };
     });
   } catch (e) {
@@ -225,54 +229,114 @@ function mockImages(keyword, count) {
   var out = [];
   for (var i = 0; i < count; i++) {
     out.push({
-      url: 'https://picsum.photos/seed/' + encodeURIComponent(keyword) + '-' + i + '/1024/640',
-      alt: keyword
+      url:   'https://picsum.photos/seed/' + encodeURIComponent(keyword) + '-' + i + '/1024/640',
+      title: keyword
     });
   }
   return out;
 }
 
 // ---------------------------------------------------------------------------
-// 5) Publish to WordPress REST API
+// 5) WordPress REST API helpers (JWT Authentication for WP-API plugin)
 // ---------------------------------------------------------------------------
-async function publishToWordPress(opts) {
-  var domain              = opts.domain;
-  var ssl                 = opts.ssl;
-  var username            = opts.username;
-  var password            = opts.password;
-  var applicationPassword = opts.applicationPassword;
-  var title               = opts.title;
-  var content             = opts.content;
-  var status              = opts.status || 'publish';
-  var category            = opts.category;
 
-  var protocol = ssl ? 'https' : 'http';
-  var base     = protocol + '://' + domain;
-  var auth     = applicationPassword
-    ? { username: username, password: applicationPassword }
-    : { username: username, password: password };
+/**
+ * Obtain a JWT token from the WordPress site.
+ * Requires "JWT Authentication for WP-API" plugin to be active on the site.
+ * Returns the token string, or throws on failure.
+ */
+async function getWpToken(domain, ssl, username, password) {
+  var base = siteBase(domain, ssl);
+  var resp = await axios.post(
+    base + '/wp-json/jwt-auth/v1/token',
+    { username: username, password: password },
+    { timeout: 20000 }
+  );
+  var token = resp.data && resp.data.token;
+  if (!token) throw new Error('JWT token not returned by ' + domain);
+  return token;
+}
+
+/**
+ * List categories from the WordPress site.
+ * Returns an array of { id, name, slug }.
+ */
+async function wpApiGetCategories(domain, ssl, token) {
+  var base = siteBase(domain, ssl);
+  var resp = await axios.get(base + '/wp-json/wp/v2/categories', {
+    params: { per_page: 100, orderby: 'name', order: 'asc' },
+    headers: { 'Authorization': 'Bearer ' + token },
+    timeout: 20000
+  });
+  return (resp.data || []).map(function(c) {
+    return { id: c.id, name: c.name, slug: c.slug };
+  });
+}
+
+/**
+ * Find a category by name (case-insensitive) or create it.
+ * Returns the category ID, or null if name is falsy.
+ */
+async function wpApiGetOrCreateCategory(domain, ssl, token, name) {
+  if (!name) return null;
+  var base = siteBase(domain, ssl);
+
+  // Search first
+  var resp = await axios.get(base + '/wp-json/wp/v2/categories', {
+    params: { search: name, per_page: 20 },
+    headers: { 'Authorization': 'Bearer ' + token },
+    timeout: 20000
+  });
+  var found = (resp.data || []).find(function(c) {
+    return c.name.toLowerCase() === name.toLowerCase() ||
+           c.slug === name.toLowerCase().replace(/\s+/g, '-');
+  });
+  if (found) return found.id;
+
+  // Create if not found
+  var createResp = await axios.post(
+    base + '/wp-json/wp/v2/categories',
+    { name: name },
+    {
+      headers: { 'Authorization': 'Bearer ' + token },
+      timeout: 20000
+    }
+  );
+  return createResp.data && createResp.data.id;
+}
+
+/**
+ * Publish a post via WordPress REST API using a pre-obtained JWT token.
+ * opts: { domain, ssl, token, title, content, status, category }
+ * Returns the full WP post object (includes .link for the public URL).
+ */
+async function publishToWordPress(opts) {
+  var domain   = opts.domain;
+  var ssl      = opts.ssl;
+  var token    = opts.token;
+  var title    = opts.title;
+  var content  = opts.content;
+  var status   = opts.status || 'publish';
+  var category = opts.category;
+
+  var base    = siteBase(domain, ssl);
+  var headers = { 'Authorization': 'Bearer ' + token };
 
   var payload = { title: title, content: content, status: status };
 
   if (category) {
     try {
-      var cats = await axios.get(base + '/wp-json/wp/v2/categories', {
-        params: { search: category },
-        auth: auth,
-        timeout: 20000
-      });
-      var found = (cats.data || []).find(function(c) {
-        return c.name.toLowerCase() === String(category).toLowerCase();
-      });
-      if (found) payload.categories = [found.id];
-    } catch (_) { /* category lookup is best-effort */ }
+      var catId = await wpApiGetOrCreateCategory(domain, ssl, token, category);
+      if (catId) payload.categories = [catId];
+    } catch (_) { /* category assignment is best-effort */ }
   }
 
   var resp = await axios.post(base + '/wp-json/wp/v2/posts', payload, {
-    auth: auth,
-    timeout: 60000
+    headers: headers,
+    timeout: 90000
   });
-  return resp.data;
+
+  return resp.data; // .link = public permalink, .id = WP post ID
 }
 
 // ---------------------------------------------------------------------------
@@ -297,6 +361,9 @@ module.exports = {
   generateOutline,
   generateArticle,
   fetchImages,
+  getWpToken,
+  wpApiGetCategories,
+  wpApiGetOrCreateCategory,
   publishToWordPress,
   dispatchToN8n
 };

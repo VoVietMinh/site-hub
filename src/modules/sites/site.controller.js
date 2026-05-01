@@ -5,8 +5,6 @@ const service = require('./site.service');
 const v = require('../../utils/validators');
 
 exports.index = asyncHandler(async (req, res) => {
-  // Try a live refresh; fall back to local cache so the UI never breaks if EE
-  // is offline (helpful while developing on Windows).
   let sites = [];
   let refreshError = null;
   try {
@@ -16,33 +14,22 @@ exports.index = asyncHandler(async (req, res) => {
     sites = service.listLocal();
   }
 
-  // Lightweight stats for the header strip.
   const stats = {
-    total: sites.length,
-    active: sites.filter((s) => s.status === 'active').length,
+    total:       sites.length,
+    active:      sites.filter((s) => s.status === 'active').length,
     configuring: sites.filter((s) => s.status === 'configuring').length,
-    ssl: sites.filter((s) => s.ssl).length
+    ssl:         sites.filter((s) => s.ssl).length
   };
 
-  res.render('sites/index', {
-    title: res.__('sites.title'),
-    sites,
-    stats,
-    refreshError
-  });
+  res.render('sites/index', { title: res.__('sites.title'), sites, stats, refreshError });
 });
 
 exports.showCreate = function showCreate(req, res) {
-  res.render('sites/create', {
-    title: res.__('sites.create'),
-    values: {}
-  });
+  res.render('sites/create', { title: res.__('sites.create'), values: {} });
 };
 
 exports.create = asyncHandler(async (req, res) => {
-  const {
-    domain, title, description, ssl, admin_user, admin_pass, admin_email, category
-  } = req.body || {};
+  const { domain, title, description, ssl, admin_user, admin_pass, admin_email, category } = req.body || {};
 
   if (!v.isValidDomain(domain)) {
     req.flash('error', res.__('sites.invalidDomain'));
@@ -51,21 +38,14 @@ exports.create = asyncHandler(async (req, res) => {
 
   try {
     const result = await service.createFull({
-      domain,
-      title,
-      description,
+      domain, title, description,
       ssl: ssl === 'on' || ssl === '1',
-      adminUser: admin_user,
-      adminPass: admin_pass,
-      adminEmail: admin_email,
-      category,
-      userId: req.session.user.id
+      adminUser: admin_user, adminPass: admin_pass, adminEmail: admin_email,
+      category, userId: req.session.user.id
     });
     res.render('sites/created', {
       title: res.__('sites.created', { domain: result.site.domain }),
-      site: result.site,
-      cfg: result.cfg,
-      credentials: result.credentials
+      site: result.site, cfg: result.cfg, credentials: result.credentials
     });
   } catch (err) {
     req.flash('error', err.message);
@@ -78,13 +58,20 @@ exports.detail = asyncHandler(async (req, res) => {
   v.assertDomain(domain);
   const data = await service.info(domain);
   res.render('sites/detail', {
-    title: domain,
-    domain,
-    local: data.local,
-    eeInfo: data.eeInfo,
+    title: domain, domain,
+    local: data.local, eeInfo: data.eeInfo,
     table: (data.eeInfo && data.eeInfo.table) || {},
     recentLogs: data.recentLogs || []
   });
+});
+
+exports.updateCredentials = asyncHandler(async (req, res) => {
+  const domain = req.params.domain;
+  v.assertDomain(domain);
+  const { wp_user, wp_pass } = req.body || {};
+  await service.updateCredentials(domain, wp_user, wp_pass);
+  req.flash('success', 'WordPress API credentials saved');
+  res.redirect('/sites/' + encodeURIComponent(domain));
 });
 
 exports.destroy = asyncHandler(async (req, res) => {

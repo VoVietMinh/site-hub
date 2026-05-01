@@ -139,6 +139,40 @@
 </div>
 <% } %>
 
+<!-- =================== WP REST API credentials =================== -->
+<div class="card">
+  <div class="card-header">
+    <h3>WordPress API Credentials</h3>
+    <span class="muted" style="font-size:12px;">Used for REST API publishing &amp; category management</span>
+  </div>
+  <div class="card-body">
+    <% var savedUser = (local && local.wp_user) || ''; var hasCreds = !!(local && local.wp_user && local.wp_pass); %>
+    <% if (hasCreds) { %>
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+        <span class="tag tag-green">✓ Credentials saved</span>
+        <span class="muted" style="font-size:13px;">Username: <strong><%= local.wp_user %></strong></span>
+      </div>
+    <% } else { %>
+      <div class="flash-item flash-warning" style="margin-bottom:14px;">No API credentials saved — content publishing will fail until credentials are set.</div>
+    <% } %>
+    <form method="post" action="/sites/<%= encodeURIComponent(domain) %>/credentials" class="form-grid" style="grid-template-columns: 1fr 1fr; align-items:end; gap:12px;">
+      <div class="form-row">
+        <label for="wp_user">WP Admin Username</label>
+        <input type="text" id="wp_user" name="wp_user" value="<%= savedUser %>" autocomplete="off" />
+      </div>
+      <div class="form-row">
+        <label for="wp_pass">WP Admin Password</label>
+        <input type="password" id="wp_pass" name="wp_pass" placeholder="<%= hasCreds ? '(unchanged — leave blank to keep)' : '' %>" autocomplete="new-password" />
+      </div>
+      <div class="form-row" style="grid-column: 1 / -1;">
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Save Credentials</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- =================== Database & server =================== -->
 <% if (t['DB Host'] || t['Site Root']) { %>
 <div class="card">

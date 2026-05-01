@@ -42,76 +42,43 @@ async function info(domain) {
     eeInfo.error = e.message;
   }
 
-  // Pull a slice of activity that mentions this domain anywhere in the
-  // message or meta payload — handy for surfacing the create/configure
-  // history right on the detail page.
   let recentLogs = [];
   try {
     recentLogs = logRepo.searchByMessage(domain, 30);
-  } catch (_) { /* non-fatal */ }
+  } catch (_) {}
 
   return { local, eeInfo, recentLogs };
 }
 
-/**
- * Create a brand-new WordPress site end-to-end.
- *
- * Returns BOTH the persisted site row and the credentials used during
- * creation (admin user/email/password). Callers (the controller) decide
- * whether to surface the password in the UI.
- */
 async function createFull({
-  domain,
-  title,
-  description,
-  ssl = false,
-  adminUser,
-  adminPass,
-  adminEmail,
-  category = 'Blog',
-  userId
+  domain, title, description, ssl = false,
+  adminUser, adminPass, adminEmail, category = 'Blog', userId
 }) {
   v.assertDomain(domain);
 
-  // Defaults that match the legacy bash script's intent:
-  //   ADMIN_USER="admin"
-  //   ADMIN_PASS="$(openssl rand -base64 18)"
-  //   ADMIN_EMAIL="admin@$DOMAIN"
   const finalAdminUser  = adminUser  && adminUser.trim()  ? adminUser  : 'admin';
-  const finalAdminEmail = adminEmail && adminEmail.trim() ? adminEmail : `admin@${domain}`;
+  const finalAdminEmail = adminEmail && adminEmail.trim() ? adminEmail : ('admin@' + domain);
   const generatedPass   = !adminPass || !adminPass.trim();
   const finalAdminPass  = generatedPass ? passwordGenerator.generate(20) : adminPass;
   const siteTitle       = title && title.trim() ? title : domain;
 
-  await logRepo.write({
-    level: 'info',
-    category: 'sites',
-    message: `creating site ${domain}`,
-    userId
-  });
+  await logRepo.write({ level: 'info', category: 'sites',
+    message: 'creating site ' + domain, userId });
 
-  // 1) ee site create — also passes --cache, --title, admin-* (matches bash script)
   try {
     await ee.createSite(domain, {
-      type: 'wp',
-      cache: true,
-      ssl,
-      title: siteTitle,
-      adminUser: finalAdminUser,
-      adminPass: finalAdminPass,
-      adminEmail: finalAdminEmail
+      type: 'wp', cache: true, ssl,
+      title: siteTitle, adminUser: finalAdminUser,
+      adminPass: finalAdminPass, adminEmail: finalAdminEmail
     });
   } catch (err) {
-    // Friendlier message for the most common cause: LE certificate-rate-limit.
-    // EasyEngine rolls back the whole site when SSL acquisition fails, so the
-    // user needs to know to either wait, change subdomain, or skip SSL.
     const txt = (err && err.message) || '';
     if (/rateLimited|too many certificates/i.test(txt)) {
       const friendly = new Error(
-        `Let's Encrypt rate limit hit for "${domain}" (5 certs / 7 days per exact ` +
-        `domain set). EasyEngine rolled the site back. Re-create WITHOUT SSL ` +
-        `and add it later with \`ee site update ${domain} --ssl=le\`, OR use a ` +
-        `different subdomain. Original: ${txt}`
+        'Let\'s Encrypt rate limit hit for "' + domain + '" (5 certs / 7 days per exact ' +
+        'domain set). EasyEngine rolled the site back. Re-create WITHOUT SSL ' +
+        'and add it later with `ee site update ' + domain + ' --ssl=le`, OR use a ' +
+        'different subdomain. Original: ' + txt
       );
       friendly.cause = err;
       throw friendly;
@@ -119,65 +86,49 @@ async function createFull({
     throw err;
   }
 
-  // Persist a record immediately so the UI shows progress.
   repo.upsert({
-    domain,
-    site_type: 'wp',
-    ssl: ssl ? 1 : 0,
-    status: 'configuring',
-    title: siteTitle,
-    description,
-    created_by: userId || null
+    domain, site_type: 'wp', ssl: ssl ? 1 : 0,
+    status: 'configuring', title: siteTitle, description, created_by: userId || null
   });
 
-  // 2) WP configuration via the persisted site template
-  const cfg = await wp.configureNewSite(domain, {
-    title: siteTitle,
-    description,
-    category
-  });
+  const cfg = await wp.configureNewSite(domain, { title: siteTitle, description, category });
 
   repo.upsert({
-    domain,
-    status: 'active',
-    title: siteTitle,
-    description,
-    created_by: userId || null
+    domain, status: 'active', title: siteTitle, description,
+    created_by: userId || null,
+    wp_user: finalAdminUser,
+    wp_pass: finalAdminPass
   });
 
-  await logRepo.write({
-    level: 'info',
-    category: 'sites',
-    message: `site ${domain} configured`,
-    meta: cfg,
-    userId
-  });
+  await logRepo.write({ level: 'info', category: 'sites',
+    message: 'site ' + domain + ' configured', meta: cfg, userId });
 
   return {
     site: repo.findByDomain(domain),
     cfg,
     credentials: {
-      url: `${ssl ? 'https' : 'http'}://${domain}`,
-      adminUrl: `${ssl ? 'https' : 'http'}://${domain}/wp-admin`,
-      user: finalAdminUser,
-      password: finalAdminPass,
-      email: finalAdminEmail,
+      url:              (ssl ? 'https' : 'http') + '://' + domain,
+      adminUrl:         (ssl ? 'https' : 'http') + '://' + domain + '/wp-admin',
+      user:             finalAdminUser,
+      password:         finalAdminPass,
+      email:            finalAdminEmail,
       passwordGenerated: generatedPass
     }
   };
+}
+
+async function updateCredentials(domain, wp_user, wp_pass) {
+  v.assertDomain(domain);
+  return repo.updateCredentials(domain, wp_user || null, wp_pass || null);
 }
 
 async function remove(domain, userId) {
   v.assertDomain(domain);
   await ee.deleteSite(domain);
   repo.remove(domain);
-  await logRepo.write({
-    level: 'info',
-    category: 'sites',
-    message: `site ${domain} deleted`,
-    userId
-  });
+  await logRepo.write({ level: 'info', category: 'sites',
+    message: 'site ' + domain + ' deleted', userId });
   return true;
 }
 
-module.exports = { refreshFromEE, listLocal, info, createFull, remove };
+module.exports = { refreshFromEE, listLocal, info, createFull, updateCredentials, remove };
