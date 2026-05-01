@@ -66,25 +66,56 @@ async function wpSoft(domain, wpArgv, opts = {}) {
 // ---------------------------------------------------------------------------
 // Site-wide options
 // ---------------------------------------------------------------------------
+
+/**
+ * `wp option update` returns exit 1 with stderr "Could not update option 'X'"
+ * when the new value equals the current value (it's a no-op, not a failure).
+ * We treat that case as success and only surface other non-zero exits.
+ */
+async function safeOptionUpdate(domain, key, value) {
+  const r = await wpSoft(domain, ['option', 'update', key, value]);
+  if (r.code === 0) return r;
+  if (/Could not update option/i.test(r.stderr)) return r; // value already matches
+  const msg = (r.stderr || r.stdout || '').trim();
+  const err = new Error(`wp option update ${key} failed: ${msg}`);
+  err.result = r;
+  throw err;
+}
+
 async function setSiteOptions(domain, { title, description }) {
-  if (title) await wp(domain, ['option', 'update', 'blogname', title]);
-  if (description) await wp(domain, ['option', 'update', 'blogdescription', description]);
+  if (title) await safeOptionUpdate(domain, 'blogname', title);
+  if (description) await safeOptionUpdate(domain, 'blogdescription', description);
 }
 
 async function applyOptionMap(domain, options = {}) {
   for (const [k, v_] of Object.entries(options)) {
     if (v_ === null || v_ === undefined) continue;
-    await wp(domain, ['option', 'update', k, String(v_)]);
+    await safeOptionUpdate(domain, k, String(v_));
   }
 }
 
 // ---------------------------------------------------------------------------
 // Theme + plugins
 // ---------------------------------------------------------------------------
+/**
+ * Already-installed / already-active are not real errors. WP-CLI exits 1 in
+ * those cases — we squash them so re-running create on an existing site
+ * stays idempotent.
+ */
+function isHarmlessInstallNoop(stderr) {
+  return /already installed|already active|destination folder already exists/i
+    .test(stderr || '');
+}
+
 async function installTheme(domain, slug, { activate = true } = {}) {
   const args = ['theme', 'install', slug];
   if (activate) args.push('--activate');
-  return wp(domain, args);
+  const r = await wpSoft(domain, args);
+  if (r.code !== 0 && !isHarmlessInstallNoop(r.stderr)) {
+    const err = new Error(`theme install ${slug} failed: ${(r.stderr || r.stdout).trim()}`);
+    err.result = r; throw err;
+  }
+  return r;
 }
 
 /**
@@ -96,11 +127,11 @@ async function installPlugins(domain, slugs, { activate = true } = {}) {
   for (const slug of slugs) {
     const args = ['plugin', 'install', slug];
     if (activate) args.push('--activate');
-    try {
-      await wp(domain, args);
+    const r = await wpSoft(domain, args);
+    if (r.code === 0 || isHarmlessInstallNoop(r.stderr)) {
       results.push({ slug, ok: true });
-    } catch (err) {
-      results.push({ slug, ok: false, error: err.message });
+    } else {
+      results.push({ slug, ok: false, error: (r.stderr || r.stdout).trim() });
     }
   }
   return results;
