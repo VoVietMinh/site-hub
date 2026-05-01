@@ -304,21 +304,30 @@ async function configureBlockNavigation(domain, pageRecords, menuName) {
   if (!Array.isArray(pageRecords) || pageRecords.length === 0) return null;
 
   const content = buildNavigationLinks(pageRecords);
-
-  // Sidestep multi-layer shell quoting (panel → ssh → wrapper → ee → docker
-  // exec → bash → wp) by base64-encoding the payload. Base64 is pure
-  // [A-Za-z0-9+/=] — no shell metacharacters, no possibility of an embedded
-  // quote breaking the outer quoting. PHP decodes inside `wp eval` and does
-  // both the list-existing and create/update logic in a single call.
   const contentB64 = Buffer.from(content, 'utf8').toString('base64');
   const titleB64   = Buffer.from(String(menuName || 'Main Menu'), 'utf8').toString('base64');
 
-  // PHP intentionally uses ONLY double-quoted strings so we never need a
-  // single-quote escape — that lets our outer shellQuote wrap the whole
-  // PHP body in a single pair of single quotes, producing exactly 2 `'\''`
-  // boundary sequences in the final SSH command (vs. the 4+ that broke the
-  // raw --post_content= path on this host).
-  const php = (
+  // ─────────────────────────────────────────────────────────────────────────
+  // Why this is wrapped in eval(base64_decode(...)) instead of just sent as
+  // PHP code:
+  //
+  //   The string that reaches `wp eval` travels through:
+  //     panel → ssh → host wrapper (bash -c "/usr/local/bin/ee $ARGS")
+  //          → ee binary → docker exec → inner shell → wp-cli → PHP eval
+  //
+  //   The host wrapper's `bash -c "...$ARGS"` does parameter expansion ONCE
+  //   on the substituted value. If $ARGS contains literal `$c=...` PHP
+  //   variable names, bash treats them as undefined shell variables and
+  //   silently expands them to empty strings — PHP then sees `=base64_decode(...)`
+  //   and fails to parse.
+  //
+  //   By base64-encoding the inner PHP body and only emitting the outer
+  //   wrapper `eval(base64_decode("..."));`, the string the shell touches
+  //   contains ZERO `$` characters and ZERO single quotes. Nothing to
+  //   accidentally expand, nothing to break the quoting.
+  // ─────────────────────────────────────────────────────────────────────────
+  const phpInner = (
+    'error_reporting(E_ERROR);' + // squelch the wp_actionscheduler_actions warnings during boot
     '$c=base64_decode("' + contentB64 + '");' +
     '$t=base64_decode("' + titleB64   + '");' +
     '$existing=get_posts(["post_type"=>"wp_navigation","post_status"=>"any","posts_per_page"=>50,"orderby"=>"date","order"=>"ASC"]);' +
@@ -335,10 +344,14 @@ async function configureBlockNavigation(domain, pageRecords, menuName) {
     'echo json_encode(["ids"=>$ids,"created"=>empty($existing)]);'
   );
 
-  const r = await wp(domain, ['eval', php]);
+  const phpInnerB64 = Buffer.from(phpInner, 'utf8').toString('base64');
+  const phpOuter = `eval(base64_decode("${phpInnerB64}"));`;
+
+  const r = await wp(domain, ['eval', phpOuter]);
   const out = (r.stdout || '').trim();
 
-  // Be tolerant — wp eval may emit warnings before our JSON.
+  // Be tolerant — there may be PHP warnings/notices before the final JSON
+  // (the action-scheduler tables can still produce DB errors during boot).
   const m = out.match(/\{[\s\S]*\}\s*$/);
   if (m) {
     try { return JSON.parse(m[0]); } catch (_) { /* fall through */ }
