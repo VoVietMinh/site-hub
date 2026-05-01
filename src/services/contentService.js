@@ -3,183 +3,293 @@
 /**
  * SEO content generation service.
  *
- * The system is designed so the *real* generation happens either:
- *   • locally (mock provider) – good for dev / demo
- *   • via an n8n workflow      – the URL the user provides is POSTed with the
- *                                 keyword config; the workflow handles AI
- *                                 prompts, image fetching and WP publishing
- *                                 (mirrors the structure of the imported
- *                                 `auto_post_website.json`).
+ * AI provider  : Google Gemini 1.5 Flash  (AI_PROVIDER=gemini, AI_API_KEY=...)
+ * Image search : Serper.dev /images API   (SERPER_API_KEY=...)
  *
- * The pieces are all stubbed/abstracted so swapping in real providers later
- * is mechanical.
+ * Falls back to mock data when keys are missing so local dev still works.
  */
 
 const axios = require('axios');
 const config = require('../config');
 
-// --------------------------------------------------------------------------
-// 1) Keyword generation
-// --------------------------------------------------------------------------
-async function generateKeywords({ topic, count = 5 }) {
-  const n = Math.max(1, Math.min(parseInt(count, 10) || 5, 100));
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+function capitalize(s) {
+  if (!s) return s;
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 
-  if (config.ai.provider === 'mock' || !config.ai.apiKey) {
+/**
+ * Call the Gemini 1.5 Flash generateContent endpoint and return the text.
+ * Throws on HTTP error; returns null if the response shape is unexpected.
+ */
+async function callGemini(prompt) {
+  const key = config.ai.apiKey;
+  if (!key) return null;
+
+  const url =
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' +
+    key;
+
+  const resp = await axios.post(
+    url,
+    { contents: [{ parts: [{ text: prompt }] }] },
+    { timeout: 60000 }
+  );
+
+  const text =
+    resp.data &&
+    resp.data.candidates &&
+    resp.data.candidates[0] &&
+    resp.data.candidates[0].content &&
+    resp.data.candidates[0].content.parts &&
+    resp.data.candidates[0].content.parts[0] &&
+    resp.data.candidates[0].content.parts[0].text;
+
+  return text || null;
+}
+
+// ---------------------------------------------------------------------------
+// 1) Keyword generation
+// ---------------------------------------------------------------------------
+async function generateKeywords(opts) {
+  var topic = opts.topic;
+  var count = opts.count;
+  var n = Math.max(1, Math.min(parseInt(count, 10) || 5, 100));
+
+  if (config.ai.provider !== 'gemini' || !config.ai.apiKey) {
     return mockKeywords(topic, n);
   }
 
-  // Real provider integration would go here. Kept as a clear extension point.
-  // Example: OpenAI-compatible chat completion.
   try {
-    const resp = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
-      {
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: 'You generate SEO keyword lists. Return ONLY a JSON array of strings.' },
-          { role: 'user', content: `Generate ${n} SEO keywords for the topic: "${topic}". JSON array only.` }
-        ],
-        temperature: 0.7
-      },
-      {
-        headers: { Authorization: `Bearer ${config.ai.apiKey}` },
-        timeout: 30000
-      }
-    );
-    const text = resp.data.choices[0].message.content.trim();
-    const match = text.match(/\[[\s\S]*\]/);
-    return match ? JSON.parse(match[0]) : mockKeywords(topic, n);
+    var prompt =
+      'Generate exactly ' + n + ' SEO keyword phrases for the topic: "' + topic + '".\n' +
+      'Return ONLY a valid JSON array of strings, no explanation, no markdown. Example: ["kw1","kw2"]';
+
+    var text = await callGemini(prompt);
+    if (!text) return mockKeywords(topic, n);
+
+    var match = text.match(/\[[\s\S]*\]/);
+    if (match) {
+      var parsed = JSON.parse(match[0]);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed.slice(0, n);
+    }
+    return mockKeywords(topic, n);
   } catch (e) {
     return mockKeywords(topic, n);
   }
 }
 
 function mockKeywords(topic, n) {
-  const seeds = [
-    'best',
-    'how to',
-    'top',
-    'guide to',
-    'review of',
-    'why',
-    'benefits of',
-    'tips for',
-    'introduction to',
-    'comparison of'
-  ];
-  const out = [];
-  for (let i = 0; i < n; i++) {
-    out.push(`${seeds[i % seeds.length]} ${topic}`.toLowerCase());
+  var seeds = ['best', 'how to', 'top', 'guide to', 'review of',
+               'why', 'benefits of', 'tips for', 'introduction to', 'comparison of'];
+  var out = [];
+  for (var i = 0; i < n; i++) {
+    out.push(seeds[i % seeds.length] + ' ' + topic);
   }
   return out;
 }
 
-// --------------------------------------------------------------------------
-// 2) Outline + article generation (mock)
-// --------------------------------------------------------------------------
-async function generateOutline({ keyword, numOutlines = 9, tone = 'natural, humanize' }) {
-  const sections = [];
-  for (let i = 1; i <= numOutlines; i++) {
-    sections.push(`H2: Section ${i} about ${keyword}`);
+// ---------------------------------------------------------------------------
+// 2) Outline generation
+// ---------------------------------------------------------------------------
+async function generateOutline(opts) {
+  var keyword    = opts.keyword;
+  var numOutlines = opts.numOutlines || 9;
+  var tone       = opts.tone || 'natural, humanize';
+
+  if (config.ai.provider !== 'gemini' || !config.ai.apiKey) {
+    return mockOutline(keyword, numOutlines);
   }
-  return { keyword, tone, sections };
+
+  try {
+    var prompt =
+      'Create a detailed SEO blog post outline for the keyword: "' + keyword + '".\n' +
+      'Tone: ' + tone + '.\n' +
+      'Include exactly ' + numOutlines + ' main sections (H2 headings).\n' +
+      'Return ONLY a valid JSON object in this format (no markdown, no extra text):\n' +
+      '{"keyword":"' + keyword + '","tone":"' + tone + '","sections":["H2: Section title 1","H2: Section title 2",...]}';
+
+    var text = await callGemini(prompt);
+    if (!text) return mockOutline(keyword, numOutlines);
+
+    var match = text.match(/\{[\s\S]*\}/);
+    if (match) {
+      var parsed = JSON.parse(match[0]);
+      if (parsed && Array.isArray(parsed.sections)) return parsed;
+    }
+    return mockOutline(keyword, numOutlines);
+  } catch (e) {
+    return mockOutline(keyword, numOutlines);
+  }
 }
 
-async function generateArticle({ keyword, outline, tone = 'natural, humanize' }) {
-  const intro = `# ${capitalize(keyword)}\n\nThis article explores **${keyword}** in a ${tone} voice.\n`;
-  const body = outline.sections
-    .map((sec, i) => {
-      const heading = sec.replace(/^H2:\s*/, '');
-      return `\n## ${heading}\n\nContent for "${heading}". This is placeholder copy that an AI provider would replace at runtime.\n`;
-    })
-    .join('\n');
-  const conclusion = `\n## Conclusion\n\nFinal thoughts on ${keyword}.\n`;
-  return {
-    title: capitalize(keyword),
-    content: intro + body + conclusion
-  };
+function mockOutline(keyword, numOutlines) {
+  var sections = [];
+  for (var i = 1; i <= numOutlines; i++) {
+    sections.push('H2: Section ' + i + ' about ' + keyword);
+  }
+  return { keyword: keyword, tone: 'natural, humanize', sections: sections };
 }
 
-// --------------------------------------------------------------------------
-// 3) Image fetching (placeholder)
-// --------------------------------------------------------------------------
-async function fetchImages({ keyword, count = 3 }) {
-  // In production this hits SerpAPI / Google CSE. Mock returns placeholder
-  // URLs so the rest of the pipeline still works end-to-end.
-  const out = [];
-  for (let i = 0; i < count; i++) {
+// ---------------------------------------------------------------------------
+// 3) Article generation
+// ---------------------------------------------------------------------------
+async function generateArticle(opts) {
+  var keyword = opts.keyword;
+  var outline = opts.outline;
+  var tone    = opts.tone || 'natural, humanize';
+
+  if (config.ai.provider !== 'gemini' || !config.ai.apiKey) {
+    return mockArticle(keyword, outline);
+  }
+
+  try {
+    var sectionsText = (outline.sections || [])
+      .map(function(s, i) { return (i + 1) + '. ' + s; })
+      .join('\n');
+
+    var prompt =
+      'Write a complete, high-quality SEO blog post for the keyword: "' + keyword + '".\n' +
+      'Tone: ' + tone + '.\n' +
+      'Use these sections as the structure:\n' + sectionsText + '\n\n' +
+      'Requirements:\n' +
+      '- Write in HTML (use <h1>, <h2>, <p>, <ul>, <li> tags)\n' +
+      '- Each section should have 2-4 paragraphs of original content\n' +
+      '- Include the keyword naturally throughout\n' +
+      '- Return ONLY a JSON object: {"title":"Article title","content":"<html content>"}\n' +
+      '- No markdown code blocks, no extra text outside the JSON';
+
+    var text = await callGemini(prompt);
+    if (!text) return mockArticle(keyword, outline);
+
+    var match = text.match(/\{[\s\S]*\}/);
+    if (match) {
+      var parsed = JSON.parse(match[0]);
+      if (parsed && parsed.title && parsed.content) return parsed;
+    }
+    return mockArticle(keyword, outline);
+  } catch (e) {
+    return mockArticle(keyword, outline);
+  }
+}
+
+function mockArticle(keyword, outline) {
+  var intro = '<h1>' + capitalize(keyword) + '</h1>\n<p>This article explores <strong>' + keyword + '</strong>.</p>\n';
+  var body = (outline.sections || []).map(function(sec) {
+    var heading = sec.replace(/^H2:\s*/, '');
+    return '<h2>' + heading + '</h2>\n<p>Content for "' + heading + '".</p>\n';
+  }).join('');
+  return { title: capitalize(keyword), content: intro + body };
+}
+
+// ---------------------------------------------------------------------------
+// 4) Image search via Serper.dev
+// ---------------------------------------------------------------------------
+async function fetchImages(opts) {
+  var keyword = opts.keyword;
+  var count   = opts.count || 3;
+  var apiKey  = config.images.serperApiKey;
+
+  if (!apiKey) {
+    return mockImages(keyword, count);
+  }
+
+  try {
+    var resp = await axios.post(
+      'https://google.serper.dev/images',
+      { q: keyword, num: count },
+      {
+        headers: {
+          'X-API-KEY': apiKey,
+          'Content-Type': 'application/json'
+        },
+        timeout: 20000
+      }
+    );
+
+    var images = (resp.data && resp.data.images) || [];
+    return images.slice(0, count).map(function(img) {
+      return {
+        url: img.imageUrl || img.link || '',
+        alt: img.title || keyword
+      };
+    });
+  } catch (e) {
+    return mockImages(keyword, count);
+  }
+}
+
+function mockImages(keyword, count) {
+  var out = [];
+  for (var i = 0; i < count; i++) {
     out.push({
-      url: `https://picsum.photos/seed/${encodeURIComponent(keyword)}-${i}/1024/640`,
+      url: 'https://picsum.photos/seed/' + encodeURIComponent(keyword) + '-' + i + '/1024/640',
       alt: keyword
     });
   }
   return out;
 }
 
-// --------------------------------------------------------------------------
-// 4) Publishing via WordPress REST API (json-api-auth plugin)
-// --------------------------------------------------------------------------
-async function publishToWordPress({
-  domain,
-  ssl = false,
-  username,
-  password,
-  applicationPassword,
-  title,
-  content,
-  status = 'publish',
-  category
-}) {
-  const protocol = ssl ? 'https' : 'http';
-  const base = `${protocol}://${domain}`;
+// ---------------------------------------------------------------------------
+// 5) Publish to WordPress REST API
+// ---------------------------------------------------------------------------
+async function publishToWordPress(opts) {
+  var domain              = opts.domain;
+  var ssl                 = opts.ssl;
+  var username            = opts.username;
+  var password            = opts.password;
+  var applicationPassword = opts.applicationPassword;
+  var title               = opts.title;
+  var content             = opts.content;
+  var status              = opts.status || 'publish';
+  var category            = opts.category;
 
-  const auth = applicationPassword
-    ? { username, password: applicationPassword }
-    : { username, password };
+  var protocol = ssl ? 'https' : 'http';
+  var base     = protocol + '://' + domain;
+  var auth     = applicationPassword
+    ? { username: username, password: applicationPassword }
+    : { username: username, password: password };
 
-  const payload = { title, content, status };
+  var payload = { title: title, content: content, status: status };
 
   if (category) {
     try {
-      const cats = await axios.get(`${base}/wp-json/wp/v2/categories`, {
+      var cats = await axios.get(base + '/wp-json/wp/v2/categories', {
         params: { search: category },
-        auth,
+        auth: auth,
         timeout: 20000
       });
-      const found = (cats.data || []).find((c) => c.name.toLowerCase() === String(category).toLowerCase());
+      var found = (cats.data || []).find(function(c) {
+        return c.name.toLowerCase() === String(category).toLowerCase();
+      });
       if (found) payload.categories = [found.id];
     } catch (_) { /* category lookup is best-effort */ }
   }
 
-  const resp = await axios.post(`${base}/wp-json/wp/v2/posts`, payload, {
-    auth,
+  var resp = await axios.post(base + '/wp-json/wp/v2/posts', payload, {
+    auth: auth,
     timeout: 60000
   });
-  return resp.data; // includes link, id, status, etc.
+  return resp.data;
 }
 
-// --------------------------------------------------------------------------
-// 5) n8n bridge — POST keyword config to the workflow webhook
-// --------------------------------------------------------------------------
-async function dispatchToN8n({ payload }) {
+// ---------------------------------------------------------------------------
+// 6) n8n bridge
+// ---------------------------------------------------------------------------
+async function dispatchToN8n(opts) {
+  var payload = opts.payload;
   if (!config.n8n.webhookUrl) {
     return { skipped: true, reason: 'N8N_WEBHOOK_URL not set' };
   }
-  const headers = {};
+  var headers = {};
   if (config.n8n.webhookToken) headers['X-Webhook-Token'] = config.n8n.webhookToken;
-  const resp = await axios.post(config.n8n.webhookUrl, payload, {
-    headers,
+  var resp = await axios.post(config.n8n.webhookUrl, payload, {
+    headers: headers,
     timeout: 30000
   });
   return { ok: true, data: resp.data };
-}
-
-// --------------------------------------------------------------------------
-// helpers
-// --------------------------------------------------------------------------
-function capitalize(s) {
-  if (!s) return s;
-  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 module.exports = {

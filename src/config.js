@@ -60,9 +60,7 @@ const config = {
   },
 
   images: {
-    serpApiKey: process.env.SERPAPI_KEY || '',
-    googleCseId: process.env.GOOGLE_CSE_ID || '',
-    googleCseKey: process.env.GOOGLE_CSE_KEY || ''
+    serperApiKey: process.env.SERPER_API_KEY || ''
   }
 };
 
