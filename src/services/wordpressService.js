@@ -283,6 +283,11 @@ async function isBlockTheme(domain) {
  *        "url":"/about-us/","kind":"post-type"} /-->
  */
 function buildNavigationLinks(pageRecords) {
+  // NB: blocks are joined with NO separator — the WP block parser doesn't
+  // need whitespace between block delimiters, and embedding actual newlines
+  // here causes our multi-layer shell quoting (panel → ssh → ee → bash → wp)
+  // to misparse on some hosts. Keeping the whole content on one line removes
+  // the failure mode entirely.
   return pageRecords.map((p) => {
     const json = JSON.stringify({
       label: p.menuTitle,
@@ -292,7 +297,7 @@ function buildNavigationLinks(pageRecords) {
       url: `/${p.slug}/`
     });
     return `<!-- wp:navigation-link ${json} /-->`;
-  }).join('\n');
+  }).join('');
 }
 
 async function configureBlockNavigation(domain, pageRecords, menuName) {
