@@ -1,97 +1,232 @@
+<style>
+.kw-card { background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:16px; margin-bottom:12px; }
+.kw-header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:8px; }
+.kw-meta { flex:1; min-width:0; }
+.kw-keyword { font-weight:600; font-size:15px; margin:0 0 2px; }
+.kw-post-title { font-size:12px; color:#6b7280; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:480px; }
+.kw-right { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.kw-steps { display:flex; align-items:center; flex-wrap:wrap; gap:2px; margin-bottom:8px; }
+.kw-step { display:flex; align-items:center; gap:4px; font-size:11px; padding:2px 7px; border-radius:10px; }
+.kw-step + .kw-step::before { content:'›'; color:#d1d5db; margin-right:4px; font-size:12px; }
+.kw-step.pending  { color:#9ca3af; }
+.kw-step.active   { color:#2563eb; background:#eff6ff; font-weight:600; }
+.kw-step.done     { color:#16a34a; }
+.kw-step.error    { color:#dc2626; background:#fef2f2; font-weight:600; }
+.kw-step.generated{ color:#7c3aed; }
+.kw-step-dot { width:7px; height:7px; border-radius:50%; background:currentColor; flex-shrink:0; }
+.kw-error-msg { background:#fef2f2; border:1px solid #fecaca; border-radius:4px; padding:6px 10px; font-size:12px; color:#dc2626; margin-bottom:8px; }
+.kw-actions { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+</style>
+
 <div class="page-header">
   <div>
-    <h1 class="page-title">Job #<%= job.id %> · <%= job.topic %></h1>
+    <h1 class="page-title">Job #<%= job.id %> &middot; <%= job.topic %></h1>
     <p class="page-subtitle">
-      <%= __('content.numKeywords') %>: <%= job.num_keywords %> ·
+      <%= __('content.numKeywords') %>: <%= job.num_keywords %> &middot;
       <%= __('content.status') %>:
-      <span class="tag <%= job.status === 'DONE' ? 'tag-green' : (job.status === 'RUNNING' ? 'tag-yellow' : 'tag-blue') %>"><%= job.status %></span>
+      <span id="job-status-badge" class="tag <%=
+        job.status === 'DONE'    ? 'tag-green'  :
+        job.status === 'RUNNING' ? 'tag-yellow' : 'tag-blue'
+      %>"><%= job.status %></span>
     </p>
   </div>
   <a href="/content" class="btn"><%= __('common.back') %></a>
 </div>
 
-<div class="card">
+<div class="card" style="margin-bottom:16px;">
   <div class="card-header"><h3><%= __('content.runJob') %></h3></div>
   <div class="card-body">
-    <p class="muted" style="margin-top:0;"><%= __('content.wpHelp') %></p>
-    <form method="post" action="/content/<%= job.id %>/run" class="form-grid" style="grid-template-columns: repeat(3, 1fr); align-items:end;">
-      <div class="form-row">
-        <label for="wp_user"><%= __('content.wpUser') %></label>
-        <input name="wp_user" id="wp_user" type="text" />
-      </div>
-      <div class="form-row">
-        <label for="wp_pass"><%= __('content.wpPass') %></label>
-        <input name="wp_pass" id="wp_pass" type="password" />
-      </div>
-      <div class="form-row">
-        <label for="wp_app_pass"><%= __('content.wpAppPass') %></label>
-        <input name="wp_app_pass" id="wp_app_pass" type="password" />
-      </div>
-      <div class="form-row" style="grid-column: 1 / -1;">
-        <div class="form-actions">
-          <button type="submit" class="btn btn-primary"><%= __('content.runJob') %></button>
-          <button type="submit" formaction="/content/<%= job.id %>/dispatch-n8n" class="btn"><%= __('content.dispatchN8n') %></button>
-        </div>
+    <% if (job.site_id) { %>
+      <p class="muted" style="margin:0 0 12px;">Bound to a site &mdash; posts publish automatically via WP-CLI (no credentials needed).</p>
+    <% } else { %>
+      <p class="muted" style="margin:0 0 12px;"><%= __('content.wpHelp') %></p>
+    <% } %>
+    <form method="post" action="/content/<%= job.id %>/run">
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary"><%= __('content.runJob') %></button>
+        <button type="submit" formaction="/content/<%= job.id %>/dispatch-n8n" class="btn"><%= __('content.dispatchN8n') %></button>
       </div>
     </form>
   </div>
 </div>
 
-<div class="card">
-  <div class="card-header"><h3><%= __('content.title') %></h3></div>
-  <% if (!keywords.length) { %>
-    <div class="empty"><%= __('content.empty') %></div>
-  <% } else { %>
-  <table class="table">
-    <thead>
-      <tr>
-        <th><%= __('content.keyword') %></th>
-        <th><%= __('content.tone') %></th>
-        <th><%= __('content.outlines') %></th>
-        <th><%= __('content.category') %></th>
-        <th><%= __('content.publishStatus') %></th>
-        <th><%= __('content.status') %></th>
-        <th><%= __('content.postLink') %></th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      <% keywords.forEach(function(k) { %>
-      <tr>
-        <td>
-          <form id="form-<%= k.id %>" method="post" action="/content/<%= job.id %>/keywords/<%= k.id %>"></form>
-          <div><strong><%= k.keyword %></strong></div>
-          <% if (k.title) { %><div class="muted" style="font-size:12px;"><%= k.title %></div><% } %>
-        </td>
-        <td><input form="form-<%= k.id %>" name="tone" type="text" value="<%= k.tone %>" /></td>
-        <td><input form="form-<%= k.id %>" name="num_outlines" type="number" min="1" max="50" value="<%= k.num_outlines %>" style="width:80px;" /></td>
-        <td><input form="form-<%= k.id %>" name="category" type="text" value="<%= k.category || '' %>" /></td>
-        <td>
-          <select form="form-<%= k.id %>" name="publish_status">
-            <option value="publish" <%= k.publish_status === 'publish' ? 'selected' : '' %>>publish</option>
-            <option value="draft" <%= k.publish_status === 'draft' ? 'selected' : '' %>>draft</option>
-            <option value="pending" <%= k.publish_status === 'pending' ? 'selected' : '' %>>pending</option>
-          </select>
-        </td>
-        <td>
-          <% var st = k.status; var c = st === 'PUBLISHED' ? 'tag-green' : (st === 'ERROR' ? 'tag-red' : (st === 'PENDING' ? '' : 'tag-yellow')); %>
-          <span class="tag <%= c %>"><%= st %></span>
-          <% if (k.error_message) { %><div class="muted" style="font-size:11px;"><%= k.error_message %></div><% } %>
-        </td>
-        <td>
-          <% if (k.post_link) { %><a href="<%= k.post_link %>" target="_blank" rel="noopener"><%= __('common.view') %></a><% } %>
-        </td>
-        <td>
-          <div class="row-actions">
-            <button form="form-<%= k.id %>" type="submit" class="btn btn-sm"><%= __('content.save') %></button>
-            <form method="post" action="/content/<%= job.id %>/keywords/<%= k.id %>/run" style="display:inline;">
-              <button type="submit" class="btn btn-sm btn-primary"><%= __('content.run') %></button>
-            </form>
-          </div>
-        </td>
-      </tr>
-      <% }) %>
-    </tbody>
-  </table>
-  <% } %>
+<%
+var KW_PIPELINE = ['OUTLINE','ARTICLE','IMAGES','PUBLISHING'];
+
+function kwStepClass(kwStatus, stepName) {
+  var idx = KW_PIPELINE.indexOf(stepName);
+  if (kwStatus === 'PENDING')   return 'pending';
+  if (kwStatus === 'ERROR')     return 'error';
+  if (kwStatus === 'PUBLISHED') return 'done';
+  if (kwStatus === 'GENERATED') {
+    if (stepName === 'PUBLISHING') return 'generated';
+    return idx < KW_PIPELINE.indexOf('PUBLISHING') ? 'done' : 'generated';
+  }
+  var cur = KW_PIPELINE.indexOf(kwStatus);
+  if (cur === -1) return 'pending';
+  if (idx < cur)  return 'done';
+  if (idx === cur) return 'active';
+  return 'pending';
+}
+
+function kwFinalClass(kwStatus) {
+  if (kwStatus === 'PUBLISHED') return 'done';
+  if (kwStatus === 'GENERATED') return 'generated';
+  if (kwStatus === 'ERROR')     return 'error';
+  return 'pending';
+}
+
+function kwFinalLabel(kwStatus) {
+  if (kwStatus === 'PUBLISHED') return 'Published';
+  if (kwStatus === 'GENERATED') return 'Generated';
+  if (kwStatus === 'ERROR')     return 'Error';
+  return 'Publish';
+}
+
+function kwBadgeClass(kwStatus) {
+  if (kwStatus === 'PUBLISHED') return 'tag-green';
+  if (kwStatus === 'ERROR')     return 'tag-red';
+  if (kwStatus === 'GENERATED') return 'tag-blue';
+  if (kwStatus === 'PENDING')   return '';
+  return 'tag-yellow';
+}
+%>
+
+<div id="keywords-container">
+<% if (!keywords.length) { %>
+  <div class="card"><div class="empty"><%= __('content.empty') %></div></div>
+<% } %>
+<% keywords.forEach(function(k) { %>
+<div class="kw-card" id="kw-<%= k.id %>">
+  <div class="kw-header">
+    <div class="kw-meta">
+      <p class="kw-keyword"><%= k.keyword %></p>
+      <p class="kw-post-title" id="kw-<%= k.id %>-title"<%= k.title ? '' : ' style="display:none;"' %>><%= k.title || '' %></p>
+    </div>
+    <div class="kw-right">
+      <span id="kw-<%= k.id %>-badge" class="tag <%= kwBadgeClass(k.status) %>"><%= k.status %></span>
+    </div>
+  </div>
+
+  <div class="kw-steps" id="kw-<%= k.id %>-steps">
+    <% KW_PIPELINE.forEach(function(step) { %>
+    <div class="kw-step <%= kwStepClass(k.status, step) %>"><div class="kw-step-dot"></div><%= step.charAt(0) + step.slice(1).toLowerCase() %></div>
+    <% }); %>
+    <div class="kw-step <%= kwFinalClass(k.status) %>"><div class="kw-step-dot"></div><%= kwFinalLabel(k.status) %></div>
+  </div>
+
+  <div class="kw-error-msg" id="kw-<%= k.id %>-error"<%= k.error_message ? '' : ' style="display:none;"' %>><%= k.error_message || '' %></div>
+
+  <div class="kw-actions" id="kw-<%= k.id %>-actions">
+    <form method="post" action="/content/<%= job.id %>/keywords/<%= k.id %>/run" style="display:inline;">
+      <button type="submit" class="btn btn-sm btn-primary"><%= __('content.run') %></button>
+    </form>
+    <a href="/content/<%= job.id %>/keywords/<%= k.id %>" class="btn btn-sm">Edit</a>
+    <span id="kw-<%= k.id %>-publish-wrap"<%= ((k.status === 'GENERATED' || k.status === 'ERROR') && k.content) ? '' : ' style="display:none;"' %>>
+      <form method="post" action="/content/<%= job.id %>/keywords/<%= k.id %>/publish" style="display:inline;">
+        <button type="submit" class="btn btn-sm">Publish</button>
+      </form>
+    </span>
+    <a id="kw-<%= k.id %>-view-post" href="<%= k.post_link || '#' %>" target="_blank" rel="noopener" class="btn btn-sm"<%= k.post_link ? '' : ' style="display:none;"' %>>View Post &rarr;</a>
+  </div>
 </div>
+<% }); %>
+</div>
+
+<script>
+(function () {
+  var jobId = <%= job.id %>;
+  var PIPELINE = ['OUTLINE', 'ARTICLE', 'IMAGES', 'PUBLISHING'];
+  var pollTimer = null;
+
+  function stepClass(kwStatus, stepName) {
+    var idx = PIPELINE.indexOf(stepName);
+    if (kwStatus === 'PENDING')   return 'pending';
+    if (kwStatus === 'ERROR')     return 'error';
+    if (kwStatus === 'PUBLISHED') return 'done';
+    if (kwStatus === 'GENERATED') {
+      if (stepName === 'PUBLISHING') return 'generated';
+      return idx < PIPELINE.indexOf('PUBLISHING') ? 'done' : 'generated';
+    }
+    var cur = PIPELINE.indexOf(kwStatus);
+    if (cur === -1) return 'pending';
+    if (idx < cur)  return 'done';
+    if (idx === cur) return 'active';
+    return 'pending';
+  }
+
+  function finalClass(s) {
+    return s === 'PUBLISHED' ? 'done' : s === 'GENERATED' ? 'generated' : s === 'ERROR' ? 'error' : 'pending';
+  }
+  function finalLabel(s) {
+    return s === 'PUBLISHED' ? 'Published' : s === 'GENERATED' ? 'Generated' : s === 'ERROR' ? 'Error' : 'Publish';
+  }
+  function badgeClass(s) {
+    return s === 'PUBLISHED' || s === 'DONE' ? 'tag tag-green'
+         : s === 'ERROR'     ? 'tag tag-red'
+         : s === 'GENERATED' ? 'tag tag-blue'
+         : s === 'RUNNING'   ? 'tag tag-yellow'
+         : s === 'PENDING'   ? 'tag'
+         : 'tag tag-yellow';
+  }
+  function buildSteps(kwStatus) {
+    var html = '';
+    PIPELINE.forEach(function (step) {
+      var cls = stepClass(kwStatus, step);
+      var lbl = step.charAt(0) + step.slice(1).toLowerCase();
+      html += '<div class="kw-step ' + cls + '"><div class="kw-step-dot"></div>' + lbl + '</div>';
+    });
+    html += '<div class="kw-step ' + finalClass(kwStatus) + '"><div class="kw-step-dot"></div>' + finalLabel(kwStatus) + '</div>';
+    return html;
+  }
+
+  function updateKeyword(k) {
+    var el = function (id) { return document.getElementById(id); };
+
+    var badge = el('kw-' + k.id + '-badge');
+    if (badge) { badge.className = badgeClass(k.status); badge.textContent = k.status; }
+
+    var titleEl = el('kw-' + k.id + '-title');
+    if (titleEl) {
+      if (k.title) { titleEl.textContent = k.title; titleEl.style.display = ''; }
+      else titleEl.style.display = 'none';
+    }
+
+    var stepsEl = el('kw-' + k.id + '-steps');
+    if (stepsEl) stepsEl.innerHTML = buildSteps(k.status);
+
+    var errEl = el('kw-' + k.id + '-error');
+    if (errEl) {
+      if (k.error_message) { errEl.textContent = k.error_message; errEl.style.display = ''; }
+      else errEl.style.display = 'none';
+    }
+
+    var pubWrap = el('kw-' + k.id + '-publish-wrap');
+    if (pubWrap) {
+      pubWrap.style.display = ((k.status === 'GENERATED' || k.status === 'ERROR') && k.content) ? '' : 'none';
+    }
+
+    var viewPost = el('kw-' + k.id + '-view-post');
+    if (viewPost) {
+      if (k.post_link) { viewPost.href = k.post_link; viewPost.style.display = ''; }
+      else viewPost.style.display = 'none';
+    }
+  }
+
+  function poll() {
+    fetch('/content/' + jobId + '/status')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var jobBadge = document.getElementById('job-status-badge');
+        if (jobBadge) { jobBadge.className = badgeClass(data.job.status); jobBadge.textContent = data.job.status; }
+        (data.keywords || []).forEach(updateKeyword);
+        if (data.job.status !== 'RUNNING') { clearInterval(pollTimer); pollTimer = null; }
+      })
+      .catch(function () {});
+  }
+
+  if ('<%= job.status %>' === 'RUNNING') {
+    pollTimer = setInterval(poll, 3000);
+  }
+}());
+</script>

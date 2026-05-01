@@ -179,6 +179,45 @@ async function assignMenuToLocation(domain, menuName, location) {
   return wp(domain, ['menu', 'location', 'assign', menuName, location]);
 }
 
+// ---------------------------------------------------------------------------
+// Blog post creation (used by content generation pipeline)
+// ---------------------------------------------------------------------------
+/**
+ * Create a new blog post via WP-CLI. Returns { id, link }.
+ * Category is best-effort: if slug lookup fails the post is still created.
+ */
+async function createPost(domain, opts) {
+  opts = opts || {};
+  var title    = opts.title   || '';
+  var content  = opts.content || '';
+  var status   = opts.status  || 'publish';
+  var category = opts.category || null;
+
+  var args = [
+    'post', 'create',
+    '--post_type=post',
+    '--post_status=' + status,
+    '--post_title=' + title,
+    '--post_content=' + content,
+    '--porcelain'
+  ];
+
+  var r = await wp(domain, args);
+  var id = parseInt(r.stdout.trim(), 10);
+  if (!Number.isFinite(id)) {
+    throw new Error('createPost: unexpected output: ' + r.stdout.trim());
+  }
+
+  // Assign category by slug (best-effort)
+  if (category) {
+    await wpSoft(domain, ['post', 'term', 'add', String(id), 'category', String(category)]);
+  }
+
+  // Fetch the public permalink
+  var lr = await wpSoft(domain, ['post', 'get', String(id), '--field=link']);
+  return { id: id, link: lr.stdout.trim() };
+}
+
 async function flushRewrite(domain) {
   return wp(domain, ['rewrite', 'flush', '--hard']);
 }
@@ -268,6 +307,7 @@ module.exports = {
   findPageBySlug, createOrUpdatePage, createPage,
   deleteMenuByName, createMenu, addItemToMenu,
   getFirstMenuLocation, assignMenuToLocation,
+  createPost,
   flushRewrite, flushCache, getSiteUrl, getAdminPassword,
   configureNewSite
 };

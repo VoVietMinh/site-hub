@@ -49,7 +49,7 @@ exports.detail = asyncHandler(async (req, res) => {
   if (!job) return res.status(404).render('errors/404', { title: 'Not Found' });
   const keywords = repo.listKeywordsForJob(id);
   res.render('content/detail', {
-    title: `Job #${id}`,
+    title: 'Job #' + id,
     job,
     keywords
   });
@@ -62,10 +62,15 @@ exports.updateKeyword = asyncHandler(async (req, res) => {
     numOutlines: req.body.num_outlines,
     category: req.body.category,
     publishStatus: req.body.publish_status,
-    title: req.body.title
+    title: req.body.title,
+    content: req.body.content
   });
   req.flash('success', res.__('content.keywordUpdated'));
-  res.redirect('/content/' + req.params.id);
+  if (req.body._return === 'keyword') {
+    res.redirect('/content/' + req.params.id + '/keywords/' + req.params.kid);
+  } else {
+    res.redirect('/content/' + req.params.id);
+  }
 });
 
 exports.runJob = asyncHandler(async (req, res) => {
@@ -75,10 +80,9 @@ exports.runJob = asyncHandler(async (req, res) => {
     password: req.body.wp_pass,
     applicationPassword: req.body.wp_app_pass
   };
-  // Run async — kick off but don't block the response longer than needed.
   service
     .runJob(jobId, { wpCreds })
-    .catch(() => { /* errors are surfaced through logs + per-keyword status */ });
+    .catch(() => {});
   req.flash('info', res.__('content.jobStarted'));
   res.redirect('/content/' + jobId);
 });
@@ -93,6 +97,34 @@ exports.runKeyword = asyncHandler(async (req, res) => {
   service.runKeyword(kid, { wpCreds }).catch(() => {});
   req.flash('info', res.__('content.keywordStarted'));
   res.redirect('/content/' + req.params.id);
+});
+
+exports.jobStatus = asyncHandler(async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const data = service.getJobStatus(id);
+  if (!data) return res.status(404).json({ error: 'not found' });
+  res.json(data);
+});
+
+exports.keywordDetail = asyncHandler(async (req, res) => {
+  const jobId = parseInt(req.params.id, 10);
+  const kid   = parseInt(req.params.kid, 10);
+  const job     = repo.findJob(jobId);
+  const keyword = repo.findKeyword(kid);
+  if (!job || !keyword) return res.status(404).render('errors/404', { title: 'Not Found' });
+  res.render('content/keyword', { title: keyword.keyword, job, keyword });
+});
+
+exports.publishKeyword = asyncHandler(async (req, res) => {
+  const jobId = parseInt(req.params.id, 10);
+  const kid   = parseInt(req.params.kid, 10);
+  try {
+    await service.publishKeyword(kid);
+    req.flash('success', 'Published successfully');
+  } catch (err) {
+    req.flash('error', err.message);
+  }
+  res.redirect('/content/' + jobId);
 });
 
 exports.dispatchN8n = asyncHandler(async (req, res) => {

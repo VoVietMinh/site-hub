@@ -1,0 +1,107 @@
+<div class="page-header">
+  <div>
+    <h1 class="page-title"><%= keyword.keyword %></h1>
+    <p class="page-subtitle">
+      Job #<%= job.id %> &middot; <%= job.topic %> &middot;
+      <span class="tag <%=
+        keyword.status === 'PUBLISHED' ? 'tag-green'  :
+        keyword.status === 'ERROR'     ? 'tag-red'    :
+        keyword.status === 'GENERATED' ? 'tag-blue'   :
+        keyword.status === 'PENDING'   ? ''            : 'tag-yellow'
+      %>"><%= keyword.status %></span>
+    </p>
+  </div>
+  <a href="/content/<%= job.id %>" class="btn">&larr; Back to Job</a>
+</div>
+
+<% if (keyword.error_message) { %>
+<div class="flash-item flash-error" style="margin-bottom:16px;"><%= keyword.error_message %></div>
+<% } %>
+
+<div class="card">
+  <div class="card-header"><h3>Edit Content</h3></div>
+  <div class="card-body">
+    <form method="post" action="/content/<%= job.id %>/keywords/<%= keyword.id %>">
+      <input type="hidden" name="_return" value="keyword" />
+
+      <div class="form-row">
+        <label for="kw-title">Post Title</label>
+        <input type="text" id="kw-title" name="title" value="<%= keyword.title || '' %>" style="width:100%;" />
+      </div>
+
+      <div class="form-row" style="margin-top:14px;">
+        <label for="kw-content">Content <span class="muted" style="font-weight:400;">(HTML)</span></label>
+        <textarea id="kw-content" name="content" rows="22" style="width:100%;font-family:monospace;font-size:12px;line-height:1.5;"><%= keyword.content || '' %></textarea>
+      </div>
+
+      <div style="display:flex;gap:16px;margin-top:14px;flex-wrap:wrap;">
+        <div class="form-row" style="flex:1;min-width:180px;">
+          <label for="kw-category">Category</label>
+          <input type="text" id="kw-category" name="category" value="<%= keyword.category || '' %>" style="width:100%;" />
+        </div>
+        <div class="form-row" style="flex:1;min-width:160px;">
+          <label for="kw-publish-status">Publish Status</label>
+          <select id="kw-publish-status" name="publish_status" style="width:100%;">
+            <option value="publish" <%= keyword.publish_status === 'publish' ? 'selected' : '' %>>publish</option>
+            <option value="draft"   <%= keyword.publish_status === 'draft'   ? 'selected' : '' %>>draft</option>
+            <option value="pending" <%= keyword.publish_status === 'pending' ? 'selected' : '' %>>pending</option>
+          </select>
+        </div>
+        <div class="form-row" style="flex:1;min-width:120px;">
+          <label for="kw-tone">Tone</label>
+          <input type="text" id="kw-tone" name="tone" value="<%= keyword.tone || '' %>" style="width:100%;" />
+        </div>
+      </div>
+
+      <div class="form-actions" style="margin-top:16px;">
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<% if ((keyword.status === 'GENERATED' || keyword.status === 'ERROR') && keyword.content) { %>
+<div class="card" style="margin-top:16px;">
+  <div class="card-header"><h3>Publish to WordPress</h3></div>
+  <div class="card-body">
+    <p class="muted" style="margin:0 0 12px;">Save any edits first, then click Publish to push this post via WP-CLI.</p>
+    <form method="post" action="/content/<%= job.id %>/keywords/<%= keyword.id %>/publish">
+      <button type="submit" class="btn btn-primary">Publish Now</button>
+    </form>
+  </div>
+</div>
+<% } %>
+
+<% if (keyword.post_link) { %>
+<div class="card" style="margin-top:16px;">
+  <div class="card-header"><h3>Published Post</h3></div>
+  <div class="card-body">
+    <a href="<%= keyword.post_link %>" target="_blank" rel="noopener" class="btn btn-primary">View Post &rarr;</a>
+    <span class="muted" style="margin-left:12px;font-size:13px;"><%= keyword.post_link %></span>
+  </div>
+</div>
+<% } %>
+
+<% if (keyword.images_json) { %>
+<%
+  var _imgs = [];
+  try { _imgs = JSON.parse(keyword.images_json); } catch (e) {}
+%>
+<% if (_imgs.length) { %>
+<div class="card" style="margin-top:16px;">
+  <div class="card-header"><h3>Image Suggestions (<%= _imgs.length %>)</h3></div>
+  <div class="card-body">
+    <div style="display:flex;flex-wrap:wrap;gap:12px;">
+      <% _imgs.forEach(function(img) { %>
+      <div style="width:180px;">
+        <img src="<%= img.url %>" alt="<%= img.title || '' %>"
+             style="width:100%;height:120px;object-fit:cover;border-radius:4px;border:1px solid #e5e7eb;"
+             onerror="this.parentNode.style.display='none'" />
+        <% if (img.title) { %><p style="font-size:11px;color:#6b7280;margin:4px 0 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" title="<%= img.title %>"><%= img.title %></p><% } %>
+      </div>
+      <% }); %>
+    </div>
+  </div>
+</div>
+<% } %>
+<% } %>

@@ -1,232 +1,252 @@
 'use strict';
 
-/**
- * Orchestrates the full SEO content generation flow.
- *
- *  step 1: generate keywords for a topic
- *  step 2: persist keywords with per-keyword config (tone, outlines, category, status)
- *  step 3: for each keyword:
- *            - generate outline
- *            - generate article
- *            - fetch images
- *            - publish via WordPress REST API
- *            - update status + link
- *
- * If N8N_WEBHOOK_URL is configured the service can also delegate the entire
- * keyword batch to the n8n workflow in one call.
- */
-
-const repo = require('./content.repository');
-const sitesRepo = require('../sites/site.repository');
-const cs = require('../../services/contentService');
-const logRepo = require('../logs/log.repository');
-const v = require('../../utils/validators');
+const repo       = require('./content.repository');
+const sitesRepo  = require('../sites/site.repository');
+const cs         = require('../../services/contentService');
+const wpService  = require('../../services/wordpressService');
+const logRepo    = require('../logs/log.repository');
+const v          = require('../../utils/validators');
 
 async function startJob({ topic, numKeywords, siteDomain, userId }) {
   if (!v.isNonEmptyString(topic, 200)) {
-    const e = new Error('invalid topic'); e.status = 400; throw e;
+    var e = new Error('invalid topic'); e.status = 400; throw e;
   }
   if (!v.isPositiveInt(numKeywords, 100)) {
-    const e = new Error('invalid numKeywords (1-100)'); e.status = 400; throw e;
+    var e2 = new Error('invalid numKeywords (1-100)'); e2.status = 400; throw e2;
   }
 
-  let site = null;
+  var site = null;
   if (siteDomain) {
     v.assertDomain(siteDomain);
     site = sitesRepo.findByDomain(siteDomain);
   }
 
-  const job = repo.createJob({
+  var job = repo.createJob({
     site_id: site ? site.id : null,
-    topic,
+    topic: topic,
     num_keywords: numKeywords,
     created_by: userId
   });
 
-  const keywords = await cs.generateKeywords({ topic, count: numKeywords });
-  for (const kw of keywords) {
-    repo.addKeyword({ job_id: job.id, keyword: kw });
+  var keywords = await cs.generateKeywords({ topic: topic, count: numKeywords });
+  for (var i = 0; i < keywords.length; i++) {
+    repo.addKeyword({ job_id: job.id, keyword: keywords[i] });
   }
 
   await logRepo.write({
     level: 'info',
     category: 'content',
-    message: `job #${job.id} created with ${keywords.length} keywords for topic "${topic}"`,
-    userId
+    message: 'job #' + job.id + ' created with ' + keywords.length + ' keywords for topic "' + topic + '"',
+    userId: userId
   });
 
   return repo.findJob(job.id);
 }
 
-async function configureKeyword(id, { tone, numOutlines, category, publishStatus, title }) {
-  const fields = {};
-  if (tone) fields.tone = tone;
-  if (numOutlines) fields.num_outlines = parseInt(numOutlines, 10);
-  if (category !== undefined) fields.category = category;
-  if (publishStatus) fields.publish_status = publishStatus;
-  if (title !== undefined) fields.title = title;
-
-  // We bypass updateKeyword's allow-list for tone / num_outlines / category / publish_status
-  // because those columns are also user-config — so do a small direct update here.
-  const { getDb } = require('../../infrastructure/db/connection');
-  const sets = [];
-  const params = [];
-  if (fields.tone) { sets.push('tone = ?'); params.push(fields.tone); }
-  if (fields.num_outlines) { sets.push('num_outlines = ?'); params.push(fields.num_outlines); }
-  if (fields.category !== undefined) { sets.push('category = ?'); params.push(fields.category); }
-  if (fields.publish_status) { sets.push('publish_status = ?'); params.push(fields.publish_status); }
-  if (fields.title !== undefined) { sets.push('title = ?'); params.push(fields.title); }
+async function configureKeyword(id, opts) {
+  opts = opts || {};
+  var { getDb } = require('../../infrastructure/db/connection');
+  var sets = [];
+  var params = [];
+  if (opts.tone)          { sets.push('tone = ?');           params.push(opts.tone); }
+  if (opts.numOutlines)   { sets.push('num_outlines = ?');   params.push(parseInt(opts.numOutlines, 10)); }
+  if (opts.category !== undefined) { sets.push('category = ?'); params.push(opts.category); }
+  if (opts.publishStatus) { sets.push('publish_status = ?'); params.push(opts.publishStatus); }
+  if (opts.title !== undefined)    { sets.push('title = ?');    params.push(opts.title); }
+  if (opts.content !== undefined)  { sets.push('content = ?');  params.push(opts.content); }
   if (sets.length) {
     sets.push("updated_at = datetime('now')");
     params.push(id);
-    getDb().prepare(`UPDATE content_keywords SET ${sets.join(', ')} WHERE id = ?`).run(...params);
+    getDb().prepare('UPDATE content_keywords SET ' + sets.join(', ') + ' WHERE id = ?').run(...params);
   }
   return repo.findKeyword(id);
 }
 
 /**
- * Run the generation/publish pipeline for one keyword. This is intentionally
- * sequential (not bulk) so the UI can stream status updates and so failures
- * don't poison the whole batch.
+ * Run the full pipeline for one keyword.
+ * For sites managed by EasyEngine, publishing uses WP-CLI (no credentials needed).
+ * For unbound jobs, REST API credentials must be provided in wpCreds.
  */
-async function runKeyword(keywordId, { wpCreds } = {}) {
-  const k = repo.findKeyword(keywordId);
+async function runKeyword(keywordId, opts) {
+  opts = opts || {};
+  var wpCreds = opts.wpCreds || {};
+
+  var k = repo.findKeyword(keywordId);
   if (!k) throw new Error('keyword not found');
 
-  const job = repo.findJob(k.job_id);
+  var job = repo.findJob(k.job_id);
   if (!job) throw new Error('job not found');
 
-  // Resolve site
-  let site = null;
+  var site = null;
   if (job.site_id) {
-    const { getDb } = require('../../infrastructure/db/connection');
+    var { getDb } = require('../../infrastructure/db/connection');
     site = getDb().prepare('SELECT * FROM sites WHERE id = ?').get(job.site_id);
   }
 
   repo.updateKeyword(keywordId, { status: 'OUTLINE' });
 
   try {
-    const outline = await cs.generateOutline({
+    // Step 1: outline
+    var outline = await cs.generateOutline({
       keyword: k.keyword,
       numOutlines: k.num_outlines,
       tone: k.tone
     });
-    repo.updateKeyword(keywordId, {
-      outline: JSON.stringify(outline),
-      status: 'ARTICLE'
-    });
+    repo.updateKeyword(keywordId, { outline: JSON.stringify(outline), status: 'ARTICLE' });
 
-    const article = await cs.generateArticle({
+    // Step 2: article
+    var article = await cs.generateArticle({
       keyword: k.keyword,
-      outline,
+      outline: outline,
       tone: k.tone
     });
-    repo.updateKeyword(keywordId, {
-      title: article.title,
-      content: article.content,
-      status: 'IMAGES'
-    });
+    repo.updateKeyword(keywordId, { title: article.title, content: article.content, status: 'IMAGES' });
 
-    const images = await cs.fetchImages({ keyword: k.keyword, count: 3 });
-    repo.updateKeyword(keywordId, {
-      images_json: JSON.stringify(images),
-      status: 'PUBLISHING'
-    });
+    // Step 3: images
+    var images = await cs.fetchImages({ keyword: k.keyword, count: 3 });
+    repo.updateKeyword(keywordId, { images_json: JSON.stringify(images), status: 'PUBLISHING' });
 
-    if (!site) {
+    // Step 4: publish
+    if (site) {
+      // Preferred: WP-CLI — no credentials required
+      var post = await wpService.createPost(site.domain, {
+        title: article.title,
+        content: article.content,
+        status: k.publish_status || 'publish',
+        category: k.category || null
+      });
+      repo.updateKeyword(keywordId, {
+        status: 'PUBLISHED',
+        post_link: post.link || null,
+        error_message: null
+      });
+      await logRepo.write({
+        level: 'info',
+        category: 'content',
+        message: 'keyword #' + k.id + ' "' + k.keyword + '" published: ' + post.link
+      });
+    } else if (wpCreds.username && (wpCreds.password || wpCreds.applicationPassword)) {
+      // Fallback: REST API with user-provided credentials
+      var restPost = await cs.publishToWordPress({
+        domain: site ? site.domain : null,
+        ssl: site ? !!site.ssl : false,
+        username: wpCreds.username,
+        password: wpCreds.password,
+        applicationPassword: wpCreds.applicationPassword,
+        title: article.title,
+        content: article.content,
+        status: k.publish_status || 'publish',
+        category: k.category
+      });
+      repo.updateKeyword(keywordId, {
+        status: 'PUBLISHED',
+        post_link: restPost.link || null,
+        error_message: null
+      });
+    } else {
       repo.updateKeyword(keywordId, {
         status: 'GENERATED',
-        error_message: 'No site bound to this job — generation done, publishing skipped.'
+        error_message: 'No site bound to this job — content generated, ready to publish manually.'
       });
-      return repo.findKeyword(keywordId);
     }
-
-    if (!wpCreds || !wpCreds.username || !(wpCreds.password || wpCreds.applicationPassword)) {
-      repo.updateKeyword(keywordId, {
-        status: 'GENERATED',
-        error_message: 'WP credentials not provided — publishing skipped.'
-      });
-      return repo.findKeyword(keywordId);
-    }
-
-    const post = await cs.publishToWordPress({
-      domain: site.domain,
-      ssl: !!site.ssl,
-      username: wpCreds.username,
-      password: wpCreds.password,
-      applicationPassword: wpCreds.applicationPassword,
-      title: article.title,
-      content: article.content,
-      status: k.publish_status || 'publish',
-      category: k.category
-    });
-
-    repo.updateKeyword(keywordId, {
-      status: 'PUBLISHED',
-      post_link: post.link || null,
-      error_message: null
-    });
-
-    await logRepo.write({
-      level: 'info',
-      category: 'content',
-      message: `keyword #${k.id} "${k.keyword}" published: ${post.link}`
-    });
 
     return repo.findKeyword(keywordId);
   } catch (err) {
-    repo.updateKeyword(keywordId, {
-      status: 'ERROR',
-      error_message: err.message
-    });
+    repo.updateKeyword(keywordId, { status: 'ERROR', error_message: err.message });
     await logRepo.write({
       level: 'error',
       category: 'content',
-      message: `keyword #${k.id} failed: ${err.message}`,
+      message: 'keyword #' + k.id + ' failed: ' + err.message,
       meta: { stack: err.stack }
     });
     throw err;
   }
 }
 
+/**
+ * Manually publish a keyword that is in GENERATED or ERROR state.
+ * Uses WP-CLI if a site is bound, otherwise throws (no credentials available).
+ */
+async function publishKeyword(keywordId) {
+  var k = repo.findKeyword(keywordId);
+  if (!k) throw new Error('keyword not found');
+  if (!k.content) throw new Error('no content generated yet — run the keyword first');
+
+  var job = repo.findJob(k.job_id);
+  var site = null;
+  if (job && job.site_id) {
+    var { getDb } = require('../../infrastructure/db/connection');
+    site = getDb().prepare('SELECT * FROM sites WHERE id = ?').get(job.site_id);
+  }
+  if (!site) throw new Error('no site bound to this job — cannot auto-publish');
+
+  repo.updateKeyword(keywordId, { status: 'PUBLISHING', error_message: null });
+
+  try {
+    var post = await wpService.createPost(site.domain, {
+      title: k.title || k.keyword,
+      content: k.content,
+      status: k.publish_status || 'publish',
+      category: k.category || null
+    });
+    repo.updateKeyword(keywordId, {
+      status: 'PUBLISHED',
+      post_link: post.link || null,
+      error_message: null
+    });
+    await logRepo.write({
+      level: 'info',
+      category: 'content',
+      message: 'keyword #' + k.id + ' manually published: ' + post.link
+    });
+    return repo.findKeyword(keywordId);
+  } catch (err) {
+    repo.updateKeyword(keywordId, { status: 'ERROR', error_message: err.message });
+    throw err;
+  }
+}
+
 async function runJob(jobId, opts) {
-  const job = repo.findJob(jobId);
+  var job = repo.findJob(jobId);
   if (!job) throw new Error('job not found');
   repo.setJobStatus(jobId, 'RUNNING');
-  const keywords = repo.listKeywordsForJob(jobId);
-  for (const k of keywords) {
-    try {
-      await runKeyword(k.id, opts);
-    } catch (_) { /* continue with next keyword */ }
+  var keywords = repo.listKeywordsForJob(jobId);
+  for (var i = 0; i < keywords.length; i++) {
+    try { await runKeyword(keywords[i].id, opts); } catch (_) {}
   }
   repo.setJobStatus(jobId, 'DONE');
   return repo.findJob(jobId);
 }
 
 async function dispatchJobToN8n(jobId) {
-  const job = repo.findJob(jobId);
-  const keywords = repo.listKeywordsForJob(jobId);
+  var job = repo.findJob(jobId);
+  var keywords = repo.listKeywordsForJob(jobId);
   return cs.dispatchToN8n({
     payload: {
       job_id: job.id,
       topic: job.topic,
-      keywords: keywords.map((k) => ({
-        id: k.id,
-        keyword: k.keyword,
-        tone: k.tone,
-        num_outlines: k.num_outlines,
-        category: k.category,
-        publish_status: k.publish_status
-      }))
+      keywords: keywords.map(function(k) {
+        return { id: k.id, keyword: k.keyword, tone: k.tone,
+                 num_outlines: k.num_outlines, category: k.category, publish_status: k.publish_status };
+      })
     }
   });
+}
+
+/** Returns job + all keywords for live status polling. */
+function getJobStatus(jobId) {
+  var job = repo.findJob(jobId);
+  if (!job) return null;
+  return { job: job, keywords: repo.listKeywordsForJob(jobId) };
 }
 
 module.exports = {
   startJob,
   configureKeyword,
   runKeyword,
+  publishKeyword,
   runJob,
   dispatchJobToN8n,
+  getJobStatus,
   repo
 };
