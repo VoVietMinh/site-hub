@@ -236,15 +236,17 @@ async function addItemToMenu(domain, menuName, postId, menuTitle) {
 }
 
 async function getFirstMenuLocation(domain) {
+  // `wp menu location list` does NOT support --fields; it only ever has one
+  // field anyway. We pull CSV, drop the header row, and take the first
+  // column of the first data row.
   try {
-    const r = await wp(domain, [
-      'menu', 'location', 'list', '--fields=location', '--format=csv'
-    ]);
+    const r = await wp(domain, ['menu', 'location', 'list', '--format=csv']);
     const lines = r.stdout.trim().split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-    if (lines.length < 2) return null;
-    // CSV header on line 0; first real value on line 1
-    const first = lines[1].replace(/^"|"$/g, '');
-    return first || null;
+    if (lines.length < 2) return null; // header only — no menu locations declared
+    const firstRow = lines[1];
+    const firstCol = firstRow.split(',')[0] || '';
+    const cleaned = firstCol.replace(/^"|"$/g, '').trim();
+    return cleaned || null;
   } catch (_) {
     return null;
   }
