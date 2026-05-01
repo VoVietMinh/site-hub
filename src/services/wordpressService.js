@@ -258,6 +258,88 @@ async function assignMenuToLocation(domain, menuName, location) {
 }
 
 // ---------------------------------------------------------------------------
+// Block theme (Full Site Editing) navigation
+//
+// Block themes do not render classic `wp_menu` items — their header template
+// part contains a `<!-- wp:navigation /-->` block that references a
+// `wp_navigation` post type. To populate the visible navigation we either:
+//   (a) update every existing wp_navigation post with our links (covers the
+//       case where the theme already shipped one and the template refs it),
+//   (b) create a new wp_navigation post when none exist (the Navigation
+//       block falls back to the most recent published wp_navigation when
+//       no explicit `ref` is set).
+// ---------------------------------------------------------------------------
+
+async function isBlockTheme(domain) {
+  const r = await wpSoft(domain, ['eval', "echo wp_is_block_theme() ? '1' : '0';"]);
+  return r.code === 0 && r.stdout.trim() === '1';
+}
+
+/**
+ * Build the inner block-markup string for a wp_navigation post containing
+ * one navigation-link per page.
+ *
+ *   <!-- wp:navigation-link {"label":"About Us","type":"page","id":42,
+ *        "url":"/about-us/","kind":"post-type"} /-->
+ */
+function buildNavigationLinks(pageRecords) {
+  return pageRecords.map((p) => {
+    const json = JSON.stringify({
+      label: p.menuTitle,
+      type: 'page',
+      id: p.id,
+      kind: 'post-type',
+      url: `/${p.slug}/`
+    });
+    return `<!-- wp:navigation-link ${json} /-->`;
+  }).join('\n');
+}
+
+async function configureBlockNavigation(domain, pageRecords, menuName) {
+  if (!Array.isArray(pageRecords) || pageRecords.length === 0) return null;
+  const content = buildNavigationLinks(pageRecords);
+
+  // List ALL existing wp_navigation posts (any status) so we can update
+  // whichever the theme template references.
+  const listR = await wpSoft(domain, [
+    'post', 'list',
+    '--post_type=wp_navigation',
+    '--post_status=any',
+    '--field=ID',
+    '--posts_per_page=50',
+    '--orderby=date',
+    '--order=ASC'
+  ]);
+  const ids = listR.stdout.trim().split(/\r?\n/)
+    .map((s) => s.trim())
+    .filter((s) => /^\d+$/.test(s))
+    .map(Number);
+
+  if (ids.length > 0) {
+    for (const navId of ids) {
+      await wp(domain, [
+        'post', 'update', String(navId),
+        `--post_title=${menuName}`,
+        `--post_content=${content}`,
+        '--post_status=publish'
+      ]);
+    }
+    return { ids, created: false };
+  }
+
+  const r = await wp(domain, [
+    'post', 'create',
+    '--post_type=wp_navigation',
+    '--post_status=publish',
+    `--post_title=${menuName}`,
+    `--post_content=${content}`,
+    '--porcelain'
+  ]);
+  const navId = parseInt(r.stdout.trim(), 10);
+  return { ids: [navId], created: true };
+}
+
+// ---------------------------------------------------------------------------
 // Maintenance
 // ---------------------------------------------------------------------------
 async function flushRewrite(domain) {
@@ -324,7 +406,8 @@ async function configureNewSite(domain, opts = {}) {
     }
   }
 
-  // 6) Menu — delete-then-create so re-runs don't duplicate
+  // 6) Classic menu — always created (visible in Appearance > Menus and used
+  //    by classic themes). Idempotent via delete-then-create.
   const menuName = tpl.menuName || 'Main Menu';
   await deleteMenuByName(domain, menuName);
   const menuId = await createMenu(domain, menuName);
@@ -332,10 +415,23 @@ async function configureNewSite(domain, opts = {}) {
     await addItemToMenu(domain, menuName, p.id, p.menuTitle);
   }
 
-  // 7) Auto-detect theme's primary menu location and assign there
+  // 7) Auto-detect theme's primary menu location (classic themes only) and
+  //    assign the menu there.
   const menuLocation = await getFirstMenuLocation(domain);
   if (menuLocation) {
     await assignMenuToLocation(domain, menuName, menuLocation);
+  }
+
+  // 7b) Block theme (FSE) navigation — populate the wp_navigation post(s)
+  //     so the Navigation block in the theme's header template renders our
+  //     pages instead of the empty "#" placeholders.
+  let blockTheme = false;
+  let blockNavigation = null;
+  try {
+    blockTheme = await isBlockTheme(domain);
+  } catch (_) { /* fallback to classic */ }
+  if (blockTheme) {
+    blockNavigation = await configureBlockNavigation(domain, pageRecords, menuName);
   }
 
   // 8) Caches
@@ -348,7 +444,9 @@ async function configureNewSite(domain, opts = {}) {
     pages: pageRecords,
     menuName,
     menuId,
-    menuLocation: menuLocation || null
+    menuLocation: menuLocation || null,
+    isBlockTheme: blockTheme,
+    blockNavigation
   };
 }
 
@@ -368,6 +466,8 @@ module.exports = {
   addItemToMenu,
   getFirstMenuLocation,
   assignMenuToLocation,
+  isBlockTheme,
+  configureBlockNavigation,
   flushRewrite,
   flushCache,
   getSiteUrl,

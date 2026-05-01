@@ -70,6 +70,18 @@
           <% } else { %>
             <span class="muted" style="font-size:12px;">(<%= __('sites.menuNotAssigned') %>)</span>
           <% } %>
+          <% if (cfg.isBlockTheme) { %>
+            <div style="margin-top:6px;">
+              <span class="tag tag-pink">Block theme (FSE)</span>
+              <% if (cfg.blockNavigation && cfg.blockNavigation.ids && cfg.blockNavigation.ids.length) { %>
+                <span class="muted" style="font-size:12px;">
+                  wp_navigation
+                  <%= cfg.blockNavigation.created ? 'created' : 'updated' %>:
+                  #<%= cfg.blockNavigation.ids.join(', #') %>
+                </span>
+              <% } %>
+            </div>
+          <% } %>
         </div>
       </div>
       <div style="grid-column: 1 / -1;">
