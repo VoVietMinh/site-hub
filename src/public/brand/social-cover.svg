@@ -1,0 +1,60 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#001A4D;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#0052E0;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00B4FF;stop-opacity:1" />
+    </linearGradient>
+    <radialGradient id="glow1" cx="20%" cy="30%" r="50%">
+      <stop offset="0%" style="stop-color:#00B4FF;stop-opacity:0.4" />
+      <stop offset="100%" style="stop-color:#00B4FF;stop-opacity:0" />
+    </radialGradient>
+    <radialGradient id="glow2" cx="80%" cy="80%" r="50%">
+      <stop offset="0%" style="stop-color:#0099FF;stop-opacity:0.3" />
+      <stop offset="100%" style="stop-color:#0099FF;stop-opacity:0" />
+    </radialGradient>
+  </defs>
+  
+  <rect x="0" y="0" width="1200" height="630" fill="url(#bgGrad)"/>
+  <rect x="0" y="0" width="1200" height="630" fill="url(#glow1)"/>
+  <rect x="0" y="0" width="1200" height="630" fill="url(#glow2)"/>
+  
+  <g opacity="0.08" stroke="white" stroke-width="1" fill="none">
+    <line x1="0" y1="100" x2="1200" y2="100"/>
+    <line x1="0" y1="200" x2="1200" y2="200"/>
+    <line x1="0" y1="300" x2="1200" y2="300"/>
+    <line x1="0" y1="400" x2="1200" y2="400"/>
+    <line x1="0" y1="500" x2="1200" y2="500"/>
+    <line x1="100" y1="0" x2="100" y2="630"/>
+    <line x1="300" y1="0" x2="300" y2="630"/>
+    <line x1="500" y1="0" x2="500" y2="630"/>
+    <line x1="700" y1="0" x2="700" y2="630"/>
+    <line x1="900" y1="0" x2="900" y2="630"/>
+    <line x1="1100" y1="0" x2="1100" y2="630"/>
+  </g>
+  
+  <circle cx="950" cy="315" r="220" stroke="white" stroke-width="1.5" fill="none" opacity="0.15"/>
+  <circle cx="950" cy="315" r="160" stroke="white" stroke-width="1.5" fill="none" opacity="0.2"/>
+  <circle cx="950" cy="315" r="100" stroke="white" stroke-width="1.5" fill="none" opacity="0.25"/>
+  
+  <circle cx="1070" cy="315" r="5" fill="white" opacity="0.9"/>
+  <circle cx="950" cy="155" r="4" fill="white" opacity="0.7"/>
+  <circle cx="830" cy="395" r="3" fill="white" opacity="0.5"/>
+  
+  <g transform="translate(80, 200)">
+    <rect x="0" y="0" width="180" height="180" rx="40" ry="40" fill="white" opacity="0.95"/>
+    <g transform="translate(52, 38)">
+      <path d="M 0 0 L 0 104 M 0 0 L 52 0 Q 78 0 78 26 Q 78 52 52 52 L 0 52" 
+            stroke="#0066FF" stroke-width="16" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="78" cy="84" r="10" fill="#0066FF"/>
+    </g>
+  </g>
+  
+  <text x="290" y="295" font-family="DejaVu Sans, Inter, Helvetica, Arial, sans-serif" font-size="110" font-weight="bold" fill="white" letter-spacing="-3">pelxa</text>
+  
+  <text x="293" y="350" font-family="DejaVu Sans, Inter, Helvetica, Arial, sans-serif" font-size="26" font-weight="normal" fill="white" opacity="0.85" letter-spacing="0.5">Content · Ads · Traffic — Global, Future Ready</text>
+  
+  <text x="80" y="565" font-family="DejaVu Sans, Inter, Helvetica, Arial, sans-serif" font-size="20" font-weight="bold" fill="white" opacity="0.7" letter-spacing="3">PELXA.COM</text>
+  
+  <rect x="80" y="585" width="60" height="3" rx="1.5" fill="#00C2FF"/>
+</svg>

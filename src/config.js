@@ -11,7 +11,7 @@ const path = require('path');
 
 const config = {
   env: process.env.NODE_ENV || 'development',
-  appName: process.env.APP_NAME || 'EE Control Panel',
+  appName: process.env.APP_NAME || 'Pelxa Control Panel',
   port: parseInt(process.env.PORT, 10) || 3000,
 
   session: {

@@ -3,11 +3,17 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0066FF" />
   <title><%= title %> · <%= appName %></title>
+  <link rel="icon" type="image/svg+xml" href="/brand/favicon.svg" />
+  <link rel="alternate icon" href="/brand/favicon.png" />
   <link rel="stylesheet" href="/css/app.css" />
 </head>
 <body class="auth-shell">
   <div class="auth-card">
+    <div class="auth-brand">
+      <img src="/brand/logo-primary.svg" alt="Pelxa" />
+    </div>
     <h1><%= __('auth.welcome') %></h1>
     <div class="auth-sub"><%= appName %></div>
 
@@ -23,7 +29,7 @@
         <input id="password" name="password" type="password" autocomplete="current-password" required />
       </div>
       <div class="form-actions">
-        <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;"><%= __('auth.submit') %></button>
+        <button type="submit" class="btn btn-primary" style="width:100%;"><%= __('auth.submit') %></button>
       </div>
     </form>
 

@@ -50,8 +50,12 @@ app.use(expressLayouts);
 app.set('layout', 'layouts/app');
 
 // Static
-app.use('/css', express.static(path.join(__dirname, 'public', 'css')));
-app.use('/js', express.static(path.join(__dirname, 'public', 'js')));
+app.use('/css',   express.static(path.join(__dirname, 'public', 'css')));
+app.use('/js',    express.static(path.join(__dirname, 'public', 'js')));
+app.use('/brand', express.static(path.join(__dirname, 'public', 'brand')));
+app.get('/favicon.ico', (req, res) =>
+  res.sendFile(path.join(__dirname, 'public', 'brand', 'favicon.png'))
+);
 
 // Body + method override
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
