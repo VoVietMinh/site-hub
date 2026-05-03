@@ -86,13 +86,41 @@ exports.jobStatus = asyncHandler(async (req, res) => {
   res.json(data);
 });
 
+exports.checkConnection = asyncHandler(async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  try {
+    const result = await service.checkJobConnection(id);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 exports.keywordDetail = asyncHandler(async (req, res) => {
   const jobId = parseInt(req.params.id, 10);
   const kid   = parseInt(req.params.kid, 10);
   const job     = repo.findJob(jobId);
   const keyword = repo.findKeyword(kid);
   if (!job || !keyword) return res.status(404).render('errors/404', { title: 'Not Found' });
-  res.render('content/keyword', { title: keyword.keyword, job, keyword });
+
+  // Resolve site — pass sanitised info (no password) to view
+  let site = null;
+  if (job.site_id) {
+    try {
+      const { getDb } = require('../../infrastructure/db/connection');
+      const raw = getDb().prepare('SELECT * FROM sites WHERE id = ?').get(job.site_id);
+      if (raw) {
+        site = {
+          domain:   raw.domain,
+          ssl:      !!raw.ssl,
+          wpUser:   raw.wp_user || null,
+          hasCreds: !!(raw.wp_user && raw.wp_pass)
+        };
+      }
+    } catch (_) {}
+  }
+
+  res.render('content/keyword', { title: keyword.keyword, job, keyword, site });
 });
 
 exports.publishKeyword = asyncHandler(async (req, res) => {

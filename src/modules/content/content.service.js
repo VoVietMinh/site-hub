@@ -265,6 +265,45 @@ async function getJobCategories(jobId) {
   }
 }
 
+
+// ---------------------------------------------------------------------------
+// checkJobConnection — verify WP REST API connectivity for a job's site
+// ---------------------------------------------------------------------------
+async function checkJobConnection(jobId) {
+  var job  = repo.findJob(jobId);
+  var site = getSiteForJob(job);
+
+  if (!site) {
+    return { ok: false, error: 'No WordPress site bound to this job.' };
+  }
+
+  var result = {
+    ok:        false,
+    domain:    site.domain,
+    ssl:       !!site.ssl,
+    wpUser:    site.wp_user || null,
+    hasCreds:  !!(site.wp_user && site.wp_pass),
+    siteInfo:  null,
+    categories: [],
+    error:     null
+  };
+
+  if (!site.wp_user || !site.wp_pass) {
+    result.error = 'WordPress API credentials not set — go to Sites > ' + site.domain + ' and save WP Admin credentials first.';
+    return result;
+  }
+
+  try {
+    var token = await cs.getWpToken(site.domain, !!site.ssl, site.wp_user, site.wp_pass);
+    result.siteInfo   = await cs.getWpSiteInfo(site.domain, !!site.ssl, token);
+    result.categories = await cs.wpApiGetCategories(site.domain, !!site.ssl, token);
+    result.ok         = true;
+  } catch (err) {
+    result.error = err.message;
+  }
+  return result;
+}
+
 module.exports = {
   startJob,
   configureKeyword,
@@ -274,5 +313,6 @@ module.exports = {
   dispatchJobToN8n,
   getJobStatus,
   getJobCategories,
+  checkJobConnection,
   repo
 };

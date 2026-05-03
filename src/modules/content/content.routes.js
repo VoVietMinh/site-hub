@@ -13,6 +13,7 @@ router.get('/new',                          ctrl.showNew);
 router.post('/',                            ctrl.start);
 router.get('/:id/categories',              ctrl.getCategories);
 router.get('/:id/status',                  ctrl.jobStatus);
+router.get('/:id/check-connection',        ctrl.checkConnection);
 router.get('/:id/keywords/:kid',           ctrl.keywordDetail);
 router.get('/:id',                         ctrl.detail);
 router.post('/:id/run',                    ctrl.runJob);

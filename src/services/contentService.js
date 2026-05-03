@@ -227,23 +227,33 @@ async function getWpToken(domain, ssl, username, password) {
  * Returns [{ id, name, slug }]
  */
 async function wpApiGetCategories(domain, ssl, token) {
+  // GET /wp-json/wp/v2/categories — https://developer.wordpress.org/rest-api/reference/categories/
   var resp = await axios.get(
-    wpBase(ssl) + '/wp-json/wp/v2/categories',
-    wpCfg(domain, ssl, {
-      Authorization: 'Bearer ' + token,
-      'Content-Type': 'application/json'
-    })
-  );
-  Object.assign(resp.config && resp.config.params || {}, { per_page: 100, orderby: 'name', order: 'asc' });
-
-  // Re-request with params (axios doesn't merge params into wpCfg)
-  var resp2 = await axios.get(
-    wpBase(ssl) + '/wp-json/wp/v2/categories?per_page=100&orderby=name&order=asc',
+    wpBase(ssl) + '/wp-json/wp/v2/categories?per_page=100&orderby=name&order=asc&hide_empty=false',
     wpCfg(domain, ssl, { Authorization: 'Bearer ' + token })
   );
-  return (resp2.data || []).map(function(c) {
-    return { id: c.id, name: c.name, slug: c.slug };
+  return (resp.data || []).map(function(c) {
+    return { id: c.id, name: c.name, slug: c.slug, count: c.count || 0 };
   });
+}
+
+/**
+ * Discover WordPress site info.
+ * GET /wp-json/ (WP REST API root)
+ * Returns { name, description, url } or throws.
+ */
+async function getWpSiteInfo(domain, ssl, token) {
+  var resp = await axios.get(
+    wpBase(ssl) + '/wp-json/',
+    wpCfg(domain, ssl, { Authorization: 'Bearer ' + token })
+  );
+  var d = resp.data || {};
+  return {
+    name:        d.name        || domain,
+    description: d.description || '',
+    url:         d.url         || ((ssl ? 'https' : 'http') + '://' + domain),
+    namespaces:  d.namespaces  || []
+  };
 }
 
 /**
@@ -328,6 +338,7 @@ module.exports = {
   generateArticle,
   fetchImages,
   getWpToken,
+  getWpSiteInfo,
   wpApiGetCategories,
   wpApiGetOrCreateCategory,
   publishToWordPress,
