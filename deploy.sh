@@ -27,8 +27,10 @@ git fetch origin
 git reset --hard origin/$BRANCH
 
 # -- 2. Build new image (old container keeps serving) -------------------------
+# --no-cache ensures file changes are always picked up (BuildKit can cache-hit
+# COPY layers even when files change if the content hash matches a prior build)
 echo ">>  Building new image ..."
-docker compose $COMPOSE_FILES build panel
+docker compose $COMPOSE_FILES build --no-cache panel
 
 # -- 3. Fast swap (postgres stays up, only panel restarts) --------------------
 echo ">>  Swapping panel container ..."
