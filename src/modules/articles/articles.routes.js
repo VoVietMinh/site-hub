@@ -20,9 +20,5 @@ router.post('/:id/build',   ctrl.build);
 router.post('/:id/retry',   ctrl.retry);
 router.post('/:id/publish', ctrl.publish);
 router.post('/:id/update',  ctrl.update);
-router.post('/:id/build',     ctrl.build);
-router.post('/:id/retry',     ctrl.retry);
-router.post('/:id/publish',   ctrl.publish);
-router.post('/:id/update',    ctrl.update);
 
 module.exports = router;
