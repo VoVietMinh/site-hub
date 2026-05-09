@@ -218,66 +218,108 @@ function mockImages(keyword, count) {
  */
 async function getWpToken(domain, ssl, username, password) {
   var body = { username: username, password: password };
-  var cfg  = wpCfg(domain, ssl, { 'Content-Type': 'application/json' });
 
-  function wrapErr(err) {
-    var status = err.response && err.response.status;
-    // 3xx: redirect means wrong protocol — tell the user to flip the SSL toggle
-    if (status >= 300 && status < 400) {
-      var loc = (err.response.headers && err.response.headers.location) || '';
-      return new Error(
-        'WordPress redirected (' + status + ') for ' + domain + '. ' +
-        (loc.startsWith('https') ? 'Enable SSL on this site in Sites settings.' :
-         'Disable SSL on this site in Sites settings.') +
-        (loc ? ' Redirect → ' + loc : '')
+  /**
+   * Attempt order — try both protocols so a wrong SSL setting in the DB
+   * does not permanently break token retrieval (403 / 301 = wrong protocol).
+   *
+   * Endpoints tried:
+   *   1. /wp-json/api/v1/token       (JWT Authentication for WP-API plugin)
+   *   2. /wp-json/jwt-auth/v1/token  (older JWT Auth plugin)
+   * Each endpoint is tried with the configured protocol first, then the other.
+   */
+  var endpoints = ['/wp-json/api/v1/token', '/wp-json/jwt-auth/v1/token'];
+  var sslOrder  = [ssl, !ssl];  // configured protocol first, then flip
+
+  var lastErr = null;
+
+  for (var ei = 0; ei < endpoints.length; ei++) {
+    for (var si = 0; si < sslOrder.length; si++) {
+      var useSsl = sslOrder[si];
+      try {
+        var resp = await axios.post(
+          wpBase(useSsl) + endpoints[ei],
+          body,
+          wpCfg(domain, useSsl, { 'Content-Type': 'application/json' })
+        );
+        var token = (resp.data && (resp.data.jwt_token || resp.data.token)) || null;
+        if (token) return token;
+        // Response OK but no token field — don't retry, surface clearly
+        throw new Error(
+          'JWT token field missing in response from ' + domain + '. ' +
+          'Ensure the JWT Auth plugin is active. Got: ' + JSON.stringify(resp.data).slice(0, 200)
+        );
+      } catch (err) {
+        lastErr = err;
+        var status = err.response && err.response.status;
+        // 3xx redirect or 403 = likely wrong protocol; try next variant
+        if ((status >= 300 && status < 400) || status === 403) continue;
+        // Any other HTTP error (400, 401, 500…) or non-HTTP error — stop retrying this endpoint
+        break;
+      }
+    }
+  }
+
+  // Surface a meaningful error from the last attempt
+  if (lastErr) {
+    var s = lastErr.response && lastErr.response.status;
+    if (s >= 300 && s < 400) {
+      var loc = (lastErr.response.headers && lastErr.response.headers.location) || '';
+      throw new Error(
+        'WordPress redirected (' + s + ') for ' + domain + '. ' +
+        (loc.startsWith('https') ? 'Enable SSL in Sites settings.' : 'Disable SSL in Sites settings.') +
+        (loc ? ' → ' + loc : '')
       );
     }
-    if (status === 403 || status === 401) {
-      return new Error('WordPress rejected credentials for ' + domain + ' (HTTP ' + status + '). Check username/password.');
+    if (s === 403) {
+      throw new Error(
+        'WordPress blocked the JWT request for ' + domain + ' (403). ' +
+        'Check that the JWT Auth plugin is active and that REST API access is not restricted.'
+      );
     }
-    if (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND') {
-      return new Error('Cannot reach ' + domain + ' from the server (' + err.code + '). Check Docker networking.');
+    if (s === 401) {
+      throw new Error('Wrong username or password for ' + domain + ' (401).');
     }
-    return err;
+    if (lastErr.code === 'ECONNREFUSED' || lastErr.code === 'ENOTFOUND') {
+      throw new Error('Cannot reach ' + domain + ' from the server (' + lastErr.code + '). Check Docker networking / WP_API_HOST.');
+    }
+    throw lastErr;
   }
+  throw new Error('Could not obtain a JWT token from ' + domain + '.');
+}
 
-  // Try primary endpoint (JWT Authentication for WP-API — /wp-json/api/v1/token)
-  var resp;
-  try {
-    resp = await axios.post(wpBase(ssl) + '/wp-json/api/v1/token', body, cfg);
-  } catch (primaryErr) {
-    // Fall back to the older jwt-auth plugin endpoint
+/**
+ * wpGet — GET a WP REST API endpoint, auto-retrying with the opposite protocol
+ * on 403 / 3xx so a wrong ssl flag never permanently breaks read operations.
+ */
+async function wpGet(domain, ssl, path, token) {
+  var authHdr = { Authorization: 'Bearer ' + token };
+  for (var si = 0; si < 2; si++) {
+    var useSsl = si === 0 ? ssl : !ssl;
     try {
-      resp = await axios.post(wpBase(ssl) + '/wp-json/jwt-auth/v1/token', body, cfg);
-    } catch (_) {
-      throw wrapErr(primaryErr);
+      var resp = await axios.get(wpBase(useSsl) + path, wpCfg(domain, useSsl, authHdr));
+      return resp.data;
+    } catch (err) {
+      var status = err.response && err.response.status;
+      if ((status >= 300 && status < 400) || status === 403) continue;
+      throw err;
     }
   }
-
-  // Response may use jwt_token (new plugin) or token (older plugin)
-  var token = (resp.data && (resp.data.jwt_token || resp.data.token)) || null;
-  if (!token) {
-    throw new Error(
-      'JWT token not returned by ' + domain + '. ' +
-      'Ensure the JWT Auth plugin is active and credentials are correct. ' +
-      'Response: ' + JSON.stringify(resp.data).slice(0, 200)
-    );
-  }
-  return token;
+  throw new Error('Could not GET ' + path + ' from ' + domain + ' (tried both HTTP and HTTPS).');
 }
 
 /**
  * List categories.
  * GET /wp-json/wp/v2/categories
- * Returns [{ id, name, slug }]
+ * Returns [{ id, name, slug, count }]
  */
 async function wpApiGetCategories(domain, ssl, token) {
-  // GET /wp-json/wp/v2/categories — https://developer.wordpress.org/rest-api/reference/categories/
-  var resp = await axios.get(
-    wpBase(ssl) + '/wp-json/wp/v2/categories?per_page=100&orderby=name&order=asc&hide_empty=false',
-    wpCfg(domain, ssl, { Authorization: 'Bearer ' + token })
+  var data = await wpGet(
+    domain, ssl,
+    '/wp-json/wp/v2/categories?per_page=100&orderby=name&order=asc&hide_empty=false',
+    token
   );
-  return (resp.data || []).map(function(c) {
+  return (data || []).map(function(c) {
     return { id: c.id, name: c.name, slug: c.slug, count: c.count || 0 };
   });
 }
@@ -288,11 +330,7 @@ async function wpApiGetCategories(domain, ssl, token) {
  * Returns { name, description, url } or throws.
  */
 async function getWpSiteInfo(domain, ssl, token) {
-  var resp = await axios.get(
-    wpBase(ssl) + '/wp-json/',
-    wpCfg(domain, ssl, { Authorization: 'Bearer ' + token })
-  );
-  var d = resp.data || {};
+  var d = await wpGet(domain, ssl, '/wp-json/', token) || {};
   return {
     name:        d.name        || domain,
     description: d.description || '',
@@ -307,26 +345,37 @@ async function getWpSiteInfo(domain, ssl, token) {
  */
 async function wpApiGetOrCreateCategory(domain, ssl, token, name) {
   if (!name) return null;
-  var base = wpBase(ssl);
-  var searchResp = await axios.get(
-    base + '/wp-json/wp/v2/categories?search=' + encodeURIComponent(name) + '&per_page=20',
-    wpCfg(domain, ssl, { Authorization: 'Bearer ' + token })
+  var authJson = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
+
+  // Search existing categories
+  var list = await wpGet(
+    domain, ssl,
+    '/wp-json/wp/v2/categories?search=' + encodeURIComponent(name) + '&per_page=20',
+    token
   );
-  var found = (searchResp.data || []).find(function(c) {
+  var found = (list || []).find(function(c) {
     return c.name.toLowerCase() === name.toLowerCase() ||
            c.slug === name.toLowerCase().replace(/\s+/g, '-');
   });
   if (found) return found.id;
 
-  var createResp = await axios.post(
-    base + '/wp-json/wp/v2/categories',
-    { name: name },
-    wpCfg(domain, ssl, {
-      Authorization: 'Bearer ' + token,
-      'Content-Type': 'application/json'
-    })
-  );
-  return createResp.data && createResp.data.id;
+  // Create — try configured ssl then flip on 403/redirect
+  for (var si = 0; si < 2; si++) {
+    var useSsl = si === 0 ? ssl : !ssl;
+    try {
+      var resp = await axios.post(
+        wpBase(useSsl) + '/wp-json/wp/v2/categories',
+        { name: name },
+        wpCfg(domain, useSsl, authJson)
+      );
+      return resp.data && resp.data.id;
+    } catch (err) {
+      var status = err.response && err.response.status;
+      if ((status >= 300 && status < 400) || status === 403) continue;
+      throw err;
+    }
+  }
+  throw new Error('Could not create category "' + name + '" on ' + domain + '.');
 }
 
 /**
@@ -349,17 +398,26 @@ async function publishToWordPress(opts) {
     } catch (_) {}
   }
 
-  var resp = await axios.post(
-    wpBase(ssl) + '/wp-json/wp/v2/posts',
-    payload,
-    wpCfg(domain, ssl, {
-      Authorization: 'Bearer ' + token,
-      'Content-Type': 'application/json'
-    })
-  );
+  // POST /wp-json/wp/v2/posts — retry with opposite protocol on 403/redirect
+  var postResp = null;
+  var postErr  = null;
+  var authJson = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
+  for (var si = 0; si < 2; si++) {
+    var useSsl = si === 0 ? ssl : !ssl;
+    try {
+      postResp = await axios.post(wpBase(useSsl) + '/wp-json/wp/v2/posts', payload, wpCfg(domain, useSsl, authJson));
+      break;
+    } catch (err) {
+      postErr = err;
+      var st = err.response && err.response.status;
+      if ((st >= 300 && st < 400) || st === 403) continue;
+      throw err;
+    }
+  }
+  if (!postResp) throw postErr || new Error('Failed to publish post to ' + domain);
 
   // post_link may come back as the internal Docker URL — replace host with real domain
-  var post = resp.data;
+  var post = postResp.data;
   if (post && post.link) {
     post.link = post.link.replace(/^https?:\/\/[^/]+/, (ssl ? 'https' : 'http') + '://' + domain);
   }
