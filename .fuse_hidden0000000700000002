@@ -1,15 +1,19 @@
-#!/usr/bin/env bash
+#\!/usr/bin/env bash
 # =============================================================================
-# deploy.sh -- zero-downtime deploy for ee-control-panel (PostgreSQL edition)
+# deploy.sh -- zero-downtime deploy for ee-control-panel
 #
 # Strategy
 # --------
 # 1. Fetch + hard-reset to origin/main  (no merge conflicts ever)
-# 2. BUILD the new image while the old container is still serving
-# 3. SWAP: docker compose up --no-build  (< 2 s visible downtime)
-# 4. Wait for /healthz HEALTHCHECK to pass
+# 2. BUILD the new Docker image while the OLD container is still running
+#    (this is the slow part -- npm install, file copy, etc. -- ~60 s)
+# 3. SWAP: start the new container from the pre-built image (--no-build)
+#    The old container receives SIGTERM, drains in-flight requests (<= 10 s),
+#    then exits. Typical gap: < 2 seconds.
+# 4. Wait for the HEALTHCHECK (/healthz) to pass before declaring success.
 #
-# Sessions survive the swap because they live in PostgreSQL (shared service).
+# Sessions survive the swap because they are stored in SQLite (data/app.db),
+# which is bind-mounted and shared between container generations.
 # =============================================================================
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -18,42 +22,52 @@ cd "$SCRIPT_DIR"
 COMPOSE_FILES="-f docker-compose.yml -f docker-compose.ee.yml"
 CONTAINER="ee-control-panel"
 BRANCH="${1:-main}"
-HEALTH_TIMEOUT=90
+HEALTH_TIMEOUT=60   # seconds to wait for new container to become healthy
 
 # -- 1. Git sync (conflict-proof) ---------------------------------------------
 echo ">>  Syncing with origin/$BRANCH ..."
+
+# Remove WAL files from index if they were accidentally tracked
 git rm --cached data/app.db-shm data/app.db-wal data/app.db 2>/dev/null || true
+
+# Fetch then hard-reset -- discards any local changes to tracked files.
+# Untracked files (data/, logs/, secrets/, .env) are never touched.
 git fetch origin
 git reset --hard origin/$BRANCH
 
 # -- 2. Build new image (old container keeps serving) -------------------------
-echo ">>  Building new image ..."
+echo ">>  Building new image (old container is still live) ..."
 docker compose $COMPOSE_FILES build panel
 
-# -- 3. Fast swap (postgres stays up, only panel restarts) --------------------
-echo ">>  Swapping panel container ..."
+# -- 3. Fast container swap ---------------------------------------------------
+echo ">>  Swapping container (downtime < 2 s) ..."
 docker compose $COMPOSE_FILES up -d --no-build panel
 
 # -- 4. Wait for health check -------------------------------------------------
-echo ">>  Waiting for container health (timeout: ${HEALTH_TIMEOUT}s) ..."
+echo ">>  Waiting for container to be healthy (timeout: ${HEALTH_TIMEOUT}s) ..."
 ELAPSED=0
 while true; do
   STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$CONTAINER" 2>/dev/null || echo "missing")
+
   if [ "$STATUS" = "healthy" ]; then
     echo "OK  Container is healthy."
     break
   fi
+
   if [ "$STATUS" = "unhealthy" ]; then
-    echo "ERR Container UNHEALTHY. Recent logs:"
+    echo "ERR Container reported UNHEALTHY. Recent logs:"
     docker logs --tail 40 "$CONTAINER"
     exit 1
   fi
+
   if [ "$ELAPSED" -ge "$HEALTH_TIMEOUT" ]; then
-    echo "ERR Health check timed out (${HEALTH_TIMEOUT}s, status: $STATUS). Logs:"
+    echo "ERR Health check timed out after ${HEALTH_TIMEOUT}s (status: $STATUS). Recent logs:"
     docker logs --tail 40 "$CONTAINER"
     exit 1
   fi
-  sleep 2; ELAPSED=$((ELAPSED + 2))
+
+  sleep 2
+  ELAPSED=$((ELAPSED + 2))
   echo "    ... $STATUS (${ELAPSED}s)"
 done
 

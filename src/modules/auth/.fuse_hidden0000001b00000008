@@ -13,7 +13,7 @@ exports.login = asyncHandler(async (req, res) => {
   const { username, password } = req.body || {};
   const user = await userService.authenticate({ username, password });
 
-  if (!user) {
+  if (\!user) {
     await logRepo.write({ level: 'warn', category: 'auth',
       message: 'failed login for username=' + username });
     req.flash('error', res.__('auth.invalidCredentials'));

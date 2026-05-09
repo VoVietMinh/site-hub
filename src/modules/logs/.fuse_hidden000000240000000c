@@ -5,8 +5,8 @@ const { query, queryOne, execute } = require('../../infrastructure/db/connection
 const VALID_LEVELS = new Set(['debug', 'info', 'warn', 'error']);
 
 async function write({ level = 'info', category = 'app', message, meta, userId } = {}) {
-  if (!message) return null;
-  if (!VALID_LEVELS.has(level)) level = 'info';
+  if (\!message) return null;
+  if (\!VALID_LEVELS.has(level)) level = 'info';
   return queryOne(
     'INSERT INTO logs (level, category, message, meta_json, user_id) VALUES ($1,$2,$3,$4,$5) RETURNING id',
     [level, category, String(message), meta ? JSON.stringify(meta) : null, userId || null]
@@ -52,7 +52,7 @@ async function distinctCategories() {
 
 async function searchByMessage(needle, limit) {
   limit = limit || 30;
-  if (!needle || typeof needle !== 'string') return [];
+  if (\!needle || typeof needle \!== 'string') return [];
   const like = '%' + needle + '%';
   return query(
     `SELECT l.*, u.username AS user_name

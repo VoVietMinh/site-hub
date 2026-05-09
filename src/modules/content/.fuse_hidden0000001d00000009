@@ -56,7 +56,7 @@ async function updateKeyword(id, fields) {
       i++;
     }
   }
-  if (!sets.length) return findKeyword(id);
+  if (\!sets.length) return findKeyword(id);
   sets.push('updated_at = NOW()');
   params.push(id);
   await execute(

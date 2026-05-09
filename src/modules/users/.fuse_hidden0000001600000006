@@ -5,22 +5,22 @@ const repo    = require('./user.repository');
 const v       = require('../../utils/validators');
 
 async function authenticate({ username, password }) {
-  if (!v.isValidUsername(username) || !v.isStrongPassword(password)) return null;
+  if (\!v.isValidUsername(username) || \!v.isStrongPassword(password)) return null;
   const u = await repo.findByUsername(username);
-  if (!u || !u.is_active) return null;
+  if (\!u || \!u.is_active) return null;
   const ok = await bcrypt.compare(password, u.password_hash);
-  if (!ok) return null;
+  if (\!ok) return null;
   return u;
 }
 
 async function createAdmin({ username, email, password }) {
-  if (!v.isValidUsername(username)) {
+  if (\!v.isValidUsername(username)) {
     const e = new Error('invalid username'); e.status = 400; throw e;
   }
-  if (!v.isValidEmail(email)) {
+  if (\!v.isValidEmail(email)) {
     const e = new Error('invalid email'); e.status = 400; throw e;
   }
-  if (!v.isStrongPassword(password)) {
+  if (\!v.isStrongPassword(password)) {
     const e = new Error('password must be 8-128 chars'); e.status = 400; throw e;
   }
   if (await repo.findByUsername(username)) {

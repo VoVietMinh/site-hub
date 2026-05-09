@@ -32,7 +32,7 @@ async function upsert({
        wp_pass     = COALESCE(EXCLUDED.wp_pass,     sites.wp_pass),
        updated_at  = NOW()
      RETURNING *`,
-    [domain, site_type, !!ssl, status, title, description, created_by || null, wp_user || null, wp_pass || null]
+    [domain, site_type, \!\!ssl, status, title, description, created_by || null, wp_user || null, wp_pass || null]
   );
 }
 

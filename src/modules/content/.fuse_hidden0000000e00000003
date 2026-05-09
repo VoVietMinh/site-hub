@@ -10,28 +10,28 @@ const v         = require('../../utils/validators');
 // Internal helpers
 // ---------------------------------------------------------------------------
 async function getSiteForJob(job) {
-  if (!job || !job.site_id) return null;
+  if (\!job || \!job.site_id) return null;
   return sitesRepo.findById(job.site_id);
 }
 
 async function getSiteToken(site) {
-  if (!site.wp_user || !site.wp_pass) {
+  if (\!site.wp_user || \!site.wp_pass) {
     throw new Error(
       'WordPress API credentials not set for ' + site.domain +
       ' — go to Sites > ' + site.domain + ' and save WP Admin credentials first.'
     );
   }
-  return cs.getWpToken(site.domain, !!site.ssl, site.wp_user, site.wp_pass);
+  return cs.getWpToken(site.domain, \!\!site.ssl, site.wp_user, site.wp_pass);
 }
 
 // ---------------------------------------------------------------------------
 // startJob
 // ---------------------------------------------------------------------------
 async function startJob({ topic, numKeywords, siteDomain, userId }) {
-  if (!v.isNonEmptyString(topic, 200)) {
+  if (\!v.isNonEmptyString(topic, 200)) {
     const e = new Error('invalid topic'); e.status = 400; throw e;
   }
-  if (!v.isPositiveInt(numKeywords, 100)) {
+  if (\!v.isPositiveInt(numKeywords, 100)) {
     const e = new Error('invalid numKeywords (1-100)'); e.status = 400; throw e;
   }
 
@@ -66,12 +66,12 @@ async function startJob({ topic, numKeywords, siteDomain, userId }) {
 async function configureKeyword(id, opts) {
   opts = opts || {};
   const fields = {};
-  if (opts.tone          !== undefined) fields.tone           = opts.tone;
-  if (opts.numOutlines   !== undefined) fields.num_outlines   = parseInt(opts.numOutlines, 10);
-  if (opts.category      !== undefined) fields.category       = opts.category;
-  if (opts.publishStatus !== undefined) fields.publish_status = opts.publishStatus;
-  if (opts.title         !== undefined) fields.title          = opts.title;
-  if (opts.content       !== undefined) fields.content        = opts.content;
+  if (opts.tone          \!== undefined) fields.tone           = opts.tone;
+  if (opts.numOutlines   \!== undefined) fields.num_outlines   = parseInt(opts.numOutlines, 10);
+  if (opts.category      \!== undefined) fields.category       = opts.category;
+  if (opts.publishStatus \!== undefined) fields.publish_status = opts.publishStatus;
+  if (opts.title         \!== undefined) fields.title          = opts.title;
+  if (opts.content       \!== undefined) fields.content        = opts.content;
   return repo.updateKeyword(id, fields);
 }
 
@@ -81,10 +81,10 @@ async function configureKeyword(id, opts) {
 async function runKeyword(keywordId, opts) {
   opts = opts || {};
   let k = await repo.findKeyword(keywordId);
-  if (!k) throw new Error('keyword not found');
+  if (\!k) throw new Error('keyword not found');
 
   const job  = await repo.findJob(k.job_id);
-  if (!job) throw new Error('job not found');
+  if (\!job) throw new Error('job not found');
 
   const site = await getSiteForJob(job);
 
@@ -107,7 +107,7 @@ async function runKeyword(keywordId, opts) {
     if (site) {
       const token = await getSiteToken(site);
       const post  = await cs.publishToWordPress({
-        domain: site.domain, ssl: !!site.ssl, token,
+        domain: site.domain, ssl: \!\!site.ssl, token,
         title:  article.title, content: article.content,
         status: k.publish_status || 'publish', category: k.category || null
       });
@@ -135,19 +135,19 @@ async function runKeyword(keywordId, opts) {
 // ---------------------------------------------------------------------------
 async function publishKeyword(keywordId) {
   const k = await repo.findKeyword(keywordId);
-  if (!k) throw new Error('keyword not found');
-  if (!k.content) throw new Error('no content generated yet — run the keyword first');
+  if (\!k) throw new Error('keyword not found');
+  if (\!k.content) throw new Error('no content generated yet — run the keyword first');
 
   const job  = await repo.findJob(k.job_id);
   const site = await getSiteForJob(job);
-  if (!site) throw new Error('no site bound to this job — cannot auto-publish');
+  if (\!site) throw new Error('no site bound to this job — cannot auto-publish');
 
   await repo.updateKeyword(keywordId, { status: 'PUBLISHING', error_message: null });
 
   try {
     const token = await getSiteToken(site);
     const post  = await cs.publishToWordPress({
-      domain: site.domain, ssl: !!site.ssl, token,
+      domain: site.domain, ssl: \!\!site.ssl, token,
       title:  k.title || k.keyword, content: k.content,
       status: k.publish_status || 'publish', category: k.category || null
     });
@@ -166,7 +166,7 @@ async function publishKeyword(keywordId) {
 // ---------------------------------------------------------------------------
 async function runJob(jobId, opts) {
   const job = await repo.findJob(jobId);
-  if (!job) throw new Error('job not found');
+  if (\!job) throw new Error('job not found');
   await repo.setJobStatus(jobId, 'RUNNING');
   const keywords = await repo.listKeywordsForJob(jobId);
   for (let i = 0; i < keywords.length; i++) {
@@ -199,7 +199,7 @@ async function dispatchJobToN8n(jobId) {
 // ---------------------------------------------------------------------------
 async function getJobStatus(jobId) {
   const job = await repo.findJob(jobId);
-  if (!job) return null;
+  if (\!job) return null;
   return { job, keywords: await repo.listKeywordsForJob(jobId) };
 }
 
@@ -209,10 +209,10 @@ async function getJobStatus(jobId) {
 async function getJobCategories(jobId) {
   const job  = await repo.findJob(jobId);
   const site = await getSiteForJob(job);
-  if (!site || !site.wp_user || !site.wp_pass) return [];
+  if (\!site || \!site.wp_user || \!site.wp_pass) return [];
   try {
-    const token = await cs.getWpToken(site.domain, !!site.ssl, site.wp_user, site.wp_pass);
-    return await cs.wpApiGetCategories(site.domain, !!site.ssl, token);
+    const token = await cs.getWpToken(site.domain, \!\!site.ssl, site.wp_user, site.wp_pass);
+    return await cs.wpApiGetCategories(site.domain, \!\!site.ssl, token);
   } catch (_) { return []; }
 }
 
@@ -223,23 +223,23 @@ async function checkJobConnection(jobId) {
   const job  = await repo.findJob(jobId);
   const site = await getSiteForJob(job);
 
-  if (!site) return { ok: false, error: 'No WordPress site bound to this job.' };
+  if (\!site) return { ok: false, error: 'No WordPress site bound to this job.' };
 
   const result = {
-    ok: false, domain: site.domain, ssl: !!site.ssl,
-    wpUser: site.wp_user || null, hasCreds: !!(site.wp_user && site.wp_pass),
+    ok: false, domain: site.domain, ssl: \!\!site.ssl,
+    wpUser: site.wp_user || null, hasCreds: \!\!(site.wp_user && site.wp_pass),
     siteInfo: null, categories: [], error: null
   };
 
-  if (!site.wp_user || !site.wp_pass) {
+  if (\!site.wp_user || \!site.wp_pass) {
     result.error = 'WordPress API credentials not set — go to Sites > ' + site.domain + ' and save them first.';
     return result;
   }
 
   try {
-    const token       = await cs.getWpToken(site.domain, !!site.ssl, site.wp_user, site.wp_pass);
-    result.siteInfo   = await cs.getWpSiteInfo(site.domain, !!site.ssl, token);
-    result.categories = await cs.wpApiGetCategories(site.domain, !!site.ssl, token);
+    const token       = await cs.getWpToken(site.domain, \!\!site.ssl, site.wp_user, site.wp_pass);
+    result.siteInfo   = await cs.getWpSiteInfo(site.domain, \!\!site.ssl, token);
+    result.categories = await cs.wpApiGetCategories(site.domain, \!\!site.ssl, token);
     result.ok         = true;
   } catch (err) {
     result.error = err.message;

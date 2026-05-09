@@ -35,7 +35,7 @@ exports.start = asyncHandler(async (req, res) => {
 exports.detail = asyncHandler(async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const job = await repo.findJob(id);
-  if (!job) return res.status(404).render('errors/404', { title: 'Not Found' });
+  if (\!job) return res.status(404).render('errors/404', { title: 'Not Found' });
   const keywords = await repo.listKeywordsForJob(id);
   res.render('content/detail', { title: 'Job #' + id, job, keywords });
 });
@@ -82,7 +82,7 @@ exports.getCategories = asyncHandler(async (req, res) => {
 exports.jobStatus = asyncHandler(async (req, res) => {
   const id   = parseInt(req.params.id, 10);
   const data = await service.getJobStatus(id);
-  if (!data) return res.status(404).json({ error: 'not found' });
+  if (\!data) return res.status(404).json({ error: 'not found' });
   res.json(data);
 });
 
@@ -101,7 +101,7 @@ exports.keywordDetail = asyncHandler(async (req, res) => {
   const kid     = parseInt(req.params.kid, 10);
   const job     = await repo.findJob(jobId);
   const keyword = await repo.findKeyword(kid);
-  if (!job || !keyword) return res.status(404).render('errors/404', { title: 'Not Found' });
+  if (\!job || \!keyword) return res.status(404).render('errors/404', { title: 'Not Found' });
 
   let site = null;
   if (job.site_id) {
@@ -110,9 +110,9 @@ exports.keywordDetail = asyncHandler(async (req, res) => {
       if (raw) {
         site = {
           domain:   raw.domain,
-          ssl:      !!raw.ssl,
+          ssl:      \!\!raw.ssl,
           wpUser:   raw.wp_user || null,
-          hasCreds: !!(raw.wp_user && raw.wp_pass)
+          hasCreds: \!\!(raw.wp_user && raw.wp_pass)
         };
       }
     } catch (_) {}

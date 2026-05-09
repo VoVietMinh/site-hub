@@ -28,7 +28,7 @@ exports.showCreate = function showCreate(req, res) {
 
 exports.create = asyncHandler(async (req, res) => {
   const { domain, title, description, ssl, admin_user, admin_pass, admin_email, category } = req.body || {};
-  if (!v.isValidDomain(domain)) {
+  if (\!v.isValidDomain(domain)) {
     req.flash('error', res.__('sites.invalidDomain'));
     return res.status(400).render('sites/create', { title: res.__('sites.create'), values: req.body });
   }

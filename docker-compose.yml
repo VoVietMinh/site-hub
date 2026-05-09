@@ -1,4 +1,20 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ee-panel-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       panel_db
+      POSTGRES_USER:     panel_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-panelpass123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U panel_user -d panel_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   panel:
     build: .
     image: ee-control-panel:latest
@@ -8,15 +24,16 @@ services:
       - "3000:3000"
     env_file:
       - .env
-    # Lets the container resolve the host as `host.docker.internal` so the
-    # SSH bridge to EasyEngine has a stable target on Linux.
+    environment:
+      DATABASE_URL: postgres://panel_user:${POSTGRES_PASSWORD:-panelpass123}@postgres:5432/panel_db
+    depends_on:
+      postgres:
+        condition: service_healthy
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      # SQLite + log persistence
-      - ./data:/app/data
       - ./logs:/app/logs
-      # SSH key the container uses to run `ee` on the host. Path mode 0600 is
-      # required by the OpenSSH client; we set it explicitly via `:ro` mount
-      # plus `chmod 600` on the host side (see README §3).
       - ./secrets/ee_key:/app/secrets/ee_key:ro
+
+volumes:
+  postgres_data:
