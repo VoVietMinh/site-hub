@@ -9,6 +9,7 @@
  *   content_jobs     -- SEO content generation jobs (one per topic batch)
  *   content_keywords -- per-keyword config + status inside a job
  *   logs             -- application + command audit log surfaced in the UI
+ *   sessions         -- persistent express-session store (SQLiteStore)
  */
 
 const { getDb } = require('./connection');
@@ -81,10 +82,17 @@ function migrate() {
       created_at TEXT    NOT NULL DEFAULT (datetime('now'))
     );
 
-    CREATE INDEX IF NOT EXISTS idx_logs_created   ON logs(created_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_logs_category  ON logs(category);
-    CREATE INDEX IF NOT EXISTS idx_keywords_job   ON content_keywords(job_id);
-    CREATE INDEX IF NOT EXISTS idx_jobs_site      ON content_jobs(site_id);
+    CREATE TABLE IF NOT EXISTS sessions (
+      sid        TEXT    PRIMARY KEY,
+      sess       TEXT    NOT NULL,
+      expired_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_sessions_expired ON sessions(expired_at);
+    CREATE INDEX IF NOT EXISTS idx_logs_created     ON logs(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_logs_category    ON logs(category);
+    CREATE INDEX IF NOT EXISTS idx_keywords_job     ON content_keywords(job_id);
+    CREATE INDEX IF NOT EXISTS idx_jobs_site        ON content_jobs(site_id);
   `);
 
   // Additive column migrations -- idempotent (SQLite throws if column already
