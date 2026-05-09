@@ -41,12 +41,17 @@ function wpBase(ssl) {
  * Builds the axios config for a WP REST API call.
  * Injects the domain as the Host header and disables TLS cert verification
  * (cert is issued for the domain, not for host.docker.internal).
+ *
+ * maxRedirects: 0 — we must NOT follow redirects; any 301/302 from nginx-proxy
+ * will point to the real domain URL (e.g. https://domain/...) which is not
+ * reachable from inside Docker.  Instead we use the correct protocol up-front
+ * based on the `ssl` flag stored in the Sites settings.
  */
 function wpCfg(domain, ssl, extra) {
   var cfg = {
     headers: Object.assign({ Host: domain }, extra || {}),
     timeout: 30000,
-    maxRedirects: 0   // do not follow HTTP→HTTPS redirects to the real domain
+    maxRedirects: 0
   };
   if (ssl) cfg.httpsAgent = _httpsAgent;
   return cfg;
@@ -215,7 +220,28 @@ async function getWpToken(domain, ssl, username, password) {
   var body = { username: username, password: password };
   var cfg  = wpCfg(domain, ssl, { 'Content-Type': 'application/json' });
 
-  // Try primary endpoint first
+  function wrapErr(err) {
+    var status = err.response && err.response.status;
+    // 3xx: redirect means wrong protocol — tell the user to flip the SSL toggle
+    if (status >= 300 && status < 400) {
+      var loc = (err.response.headers && err.response.headers.location) || '';
+      return new Error(
+        'WordPress redirected (' + status + ') for ' + domain + '. ' +
+        (loc.startsWith('https') ? 'Enable SSL on this site in Sites settings.' :
+         'Disable SSL on this site in Sites settings.') +
+        (loc ? ' Redirect → ' + loc : '')
+      );
+    }
+    if (status === 403 || status === 401) {
+      return new Error('WordPress rejected credentials for ' + domain + ' (HTTP ' + status + '). Check username/password.');
+    }
+    if (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND') {
+      return new Error('Cannot reach ' + domain + ' from the server (' + err.code + '). Check Docker networking.');
+    }
+    return err;
+  }
+
+  // Try primary endpoint (JWT Authentication for WP-API — /wp-json/api/v1/token)
   var resp;
   try {
     resp = await axios.post(wpBase(ssl) + '/wp-json/api/v1/token', body, cfg);
@@ -224,7 +250,7 @@ async function getWpToken(domain, ssl, username, password) {
     try {
       resp = await axios.post(wpBase(ssl) + '/wp-json/jwt-auth/v1/token', body, cfg);
     } catch (_) {
-      throw primaryErr; // surface the primary error
+      throw wrapErr(primaryErr);
     }
   }
 
@@ -232,8 +258,9 @@ async function getWpToken(domain, ssl, username, password) {
   var token = (resp.data && (resp.data.jwt_token || resp.data.token)) || null;
   if (!token) {
     throw new Error(
-      'JWT token not returned by ' + domain +
-      '. Ensure the JWT Auth plugin (/wp-json/api/v1/token) is active and credentials are correct.'
+      'JWT token not returned by ' + domain + '. ' +
+      'Ensure the JWT Auth plugin is active and credentials are correct. ' +
+      'Response: ' + JSON.stringify(resp.data).slice(0, 200)
     );
   }
   return token;

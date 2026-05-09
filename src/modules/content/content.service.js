@@ -209,11 +209,17 @@ async function getJobStatus(jobId) {
 async function getJobCategories(jobId) {
   const job  = await repo.findJob(jobId);
   const site = await getSiteForJob(job);
-  if (!site || !site.wp_user || !site.wp_pass) return [];
+  if (!site) return { categories: [], error: 'No WordPress site bound to this job.' };
+  if (!site.wp_user || !site.wp_pass) {
+    return { categories: [], error: 'No WordPress credentials saved for ' + site.domain + ' — go to Sites and save them first.' };
+  }
   try {
-    const token = await cs.getWpToken(site.domain, !!site.ssl, site.wp_user, site.wp_pass);
-    return await cs.wpApiGetCategories(site.domain, !!site.ssl, token);
-  } catch (_) { return []; }
+    const token      = await cs.getWpToken(site.domain, !!site.ssl, site.wp_user, site.wp_pass);
+    const categories = await cs.wpApiGetCategories(site.domain, !!site.ssl, token);
+    return { categories, error: null };
+  } catch (err) {
+    return { categories: [], error: err.message };
+  }
 }
 
 // ---------------------------------------------------------------------------

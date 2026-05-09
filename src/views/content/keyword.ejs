@@ -235,7 +235,8 @@
     }
   });
 
-  var initialHtml = <%= JSON.stringify(keyword.content || '') %>;
+  // Escape </script> so it cannot prematurely close this script block
+  var initialHtml = <%- JSON.stringify(keyword.content || '').replace(/<\//g, '<\\/') %>;
   if (initialHtml) quill.clipboard.dangerouslyPasteHTML(initialHtml);
 
   var htmlSource = document.getElementById('html-source');
@@ -314,6 +315,13 @@
       .then(function (r) { return r.json(); })
       .then(function (data) {
         var cats = data.categories || [];
+        // Show server-side error if no categories came back
+        if (data.error && !cats.length) {
+          setCatStatus('\u26a0 ' + data.error, true);
+          if (catCount) catCount.textContent = '';
+          if (btnReload) btnReload.disabled = false;
+          return;
+        }
         var prev = catSelect.value || currentCat;
         catSelect.innerHTML = '<option value="">— none —</option>';
         cats.forEach(function (c) {
@@ -338,7 +346,7 @@
         if (btnReload) btnReload.disabled = false;
       })
       .catch(function (err) {
-        setCatStatus('Could not load categories \u2014 check site credentials.', true);
+        setCatStatus('\u26a0 Could not reach categories endpoint \u2014 ' + (err.message || 'network error'), true);
         if (catCount) catCount.textContent = '';
         if (btnReload) btnReload.disabled = false;
       });

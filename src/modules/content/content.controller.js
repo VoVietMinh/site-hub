@@ -72,8 +72,8 @@ exports.runKeyword = asyncHandler(async (req, res) => {
 exports.getCategories = asyncHandler(async (req, res) => {
   const id = parseInt(req.params.id, 10);
   try {
-    const categories = await service.getJobCategories(id);
-    res.json({ categories });
+    const result = await service.getJobCategories(id);
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message, categories: [] });
   }
