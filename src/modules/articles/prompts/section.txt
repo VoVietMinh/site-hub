@@ -1,0 +1,26 @@
+Hãy viết một đoạn nội dung chuẩn SEO dài khoảng 500-700 từ bằng tiếng Việt cho tiêu đề H2 sau:
+<h2>{{OUTLINE}}</h2>
+Đây là tiêu đề H2 trong bài viết với cấu trúc outline đầy đủ như sau:
+{{FULL_OUTLINE}}
+Từ khóa chính của bài viết là: {{KEYWORD}}
+Yêu cầu:
+- Phát triển nội dung chi tiết và chuyên sâu cho tiêu đề H2 "{{OUTLINE}}".
+- Tạo cấu trúc nội dung rõ ràng bằng cách sử dụng các heading cấp thấp hơn (H3, H4 nếu cần) và các đoạn văn bản `<p>`.
+- Khai thác các khía cạnh khác nhau, cung cấp thông tin chi tiết, ví dụ, hoặc giải thích để làm rõ ý cho tiêu đề H2.
+- Đảm bảo nội dung bao gồm các ý chính liên quan đến tiêu đề H2 trong outline đầy đủ.
+- Chèn từ khóa chính một cách tự nhiên trong suốt nội dung, bao gồm cả trong các heading cấp thấp hơn (nếu phù hợp).
+- Đảm bảo nội dung không trùng lặp với các phần khác của bài viết (tham khảo outline đầy đủ).
+- Sử dụng giọng văn {{TONE}} tự nhiên.
+- Nếu cần lấy thông tin về chủ thể kinh doanh, thương hiệu, và địa chỉ liên hệ hãy lấy nội dung: {{CONTACT_INFO}}
+- Kết quả trả về phải là một đoạn mã HTML hoàn chỉnh, bắt đầu bằng thẻ `<h2>` chứa tiêu đề, và tiếp theo là các thẻ `<h3>`, `<h4>` (nếu có) và các đoạn văn `<p>` chứa nội dung chi tiết. **Tuyệt đối không có bất kỳ ký tự hoặc câu giới thiệu nào bên ngoài đoạn mã HTML này.**
+- Không sử dụng dấu markdown ** ở bất cứ đâu
+Ví dụ về định dạng đầu ra mong muốn:
+<h2>{{OUTLINE}}</h2>
+<p>Đoạn mở đầu giới thiệu về chủ đề của tiêu đề H2.</p>
+<h3>Tiêu đề H3 thứ nhất: Một khía cạnh của {{OUTLINE}}</h3>
+<p>Giải thích chi tiết về khía cạnh này.</p>
+<h4>Tiêu đề H4: Một điểm nhỏ hơn</h4>
+<p>Thông tin chi tiết hơn về điểm nhỏ này.</p>
+<h3>Tiêu đề H3 thứ hai: Một khía cạnh khác</h3>
+<p>Giải thích và ví dụ cho khía cạnh này.</p>
+<p>Kết luận hoặc tóm tắt cho phần H2 này.</p>

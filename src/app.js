@@ -24,6 +24,8 @@ const contentRoutes   = require('./modules/content/content.routes');
 const userRoutes      = require('./modules/users/user.routes');
 const logRoutes       = require('./modules/logs/log.routes');
 const templateRoutes  = require('./modules/template/template.routes');
+const articleRoutes   = require('./modules/articles/articles.routes');
+const articlesScheduler = require('./modules/articles/articles.scheduler');
 
 // ── Express app ──────────────────────────────────────────────────────────────
 const app = express();
@@ -71,6 +73,7 @@ app.use('/content',  contentRoutes);
 app.use('/users',    userRoutes);
 app.use('/logs',     logRoutes);
 app.use('/template', templateRoutes);
+app.use('/articles', articleRoutes);
 
 app.get('/healthz', function(req, res) { res.json({ ok: true, env: config.env }); });
 
@@ -87,6 +90,8 @@ async function boot() {
     console.log('Panel listening on http://localhost:' + port);
     console.log('  default super admin: ' + config.superAdmin.username);
   });
+
+  articlesScheduler.start();
 
   function gracefulShutdown(signal) {
     console.log(signal + ' received - shutting down...');

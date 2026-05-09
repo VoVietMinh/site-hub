@@ -96,6 +96,62 @@ async function migrate() {
     CREATE INDEX IF NOT EXISTS idx_keywords_job       ON content_keywords (job_id);
     CREATE INDEX IF NOT EXISTS idx_jobs_site          ON content_jobs (site_id);
   `);
+
+  // ── Article automation additions (idempotent) ────────────────────────────
+  const siteAlters = [
+    "ALTER TABLE sites ADD COLUMN IF NOT EXISTS jwt_token        TEXT",
+    "ALTER TABLE sites ADD COLUMN IF NOT EXISTS jwt_expires_at   TIMESTAMPTZ",
+    "ALTER TABLE sites ADD COLUMN IF NOT EXISTS default_status   TEXT NOT NULL DEFAULT 'draft'",
+    "ALTER TABLE sites ADD COLUMN IF NOT EXISTS image_source     TEXT NOT NULL DEFAULT 'google'",
+    "ALTER TABLE sites ADD COLUMN IF NOT EXISTS drive_folder_id  TEXT",
+    "ALTER TABLE sites ADD COLUMN IF NOT EXISTS default_tone     TEXT NOT NULL DEFAULT 'natural, humanize'",
+    "ALTER TABLE sites ADD COLUMN IF NOT EXISTS contact_info     TEXT"
+  ];
+  for (const sql of siteAlters) await pool.query(sql);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS articles (
+      id                SERIAL PRIMARY KEY,
+      site_id           INTEGER REFERENCES sites(id) ON DELETE CASCADE,
+      user_id           INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      keyword           TEXT    NOT NULL,
+      title             TEXT,
+      outline           TEXT,
+      content_html      TEXT,
+      meta_description  TEXT,
+      main_keyword      TEXT,
+      tags              JSONB,
+      category_id       INTEGER,
+      featured_media_id INTEGER,
+      wp_post_id        INTEGER,
+      wp_post_link      TEXT,
+      outline_count     INTEGER NOT NULL DEFAULT 9,
+      tone              TEXT    NOT NULL DEFAULT 'natural, humanize',
+      status            TEXT    NOT NULL DEFAULT 'PENDING'
+                          CHECK (status IN ('PENDING','QUEUED','BUILDING','READY','PUBLISHING','DONE','FAILED')),
+      publish_mode      TEXT    NOT NULL DEFAULT 'immediate'
+                          CHECK (publish_mode IN ('immediate','scheduled')),
+      scheduled_at      TIMESTAMPTZ,
+      error_message     TEXT,
+      retry_count       INTEGER NOT NULL DEFAULT 0,
+      created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS article_images (
+      id            SERIAL PRIMARY KEY,
+      article_id    INTEGER NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+      position      INTEGER NOT NULL DEFAULT 0,
+      source_url    TEXT,
+      wp_media_id   INTEGER,
+      wp_media_url  TEXT,
+      is_featured   BOOLEAN NOT NULL DEFAULT FALSE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_articles_site_status  ON articles (site_id, status);
+    CREATE INDEX IF NOT EXISTS idx_articles_sched        ON articles (status, scheduled_at);
+    CREATE INDEX IF NOT EXISTS idx_article_imgs          ON article_images (article_id);
+  `);
 }
 
 if (require.main === module) {

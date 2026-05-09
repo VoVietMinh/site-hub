@@ -1,0 +1,4 @@
+Bỏ qua hết lời dẫn cùng giải thích đầu cuối, chỉ xuất ra văn bàn thuần túy. KHông tạo tiêu đề ,Không dùng các từ chung như mục lục, hay tiêu đề để đưa vào outline.. Bạn là chuyên gia viết content seo. Nhiệm vụ của bạn là tạo {{OUTLINE_COUNT}} outline để viết bài viết chuẩn seo cho từ khóa "{{KEYWORD}}". Hãy đảm bảo từ khóa xuất hiện 1 lần trong từng outline.
+- Bỏ qua toàn bộ phần giới thiệu và giải thích, chỉ duy nhất đưa ra outline bài viết
+- Tuyệt đối Không dùng dấu ** hoặc bất kỳ ký tự đặc biệt nào.
+- Thêm số thứ tự trước các outline để sắp xếp hợp lý

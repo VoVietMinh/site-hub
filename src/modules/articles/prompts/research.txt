@@ -1,0 +1,14 @@
+"Hãy tổng hợp thông tin từ 3 kết quả tìm kiếm đầu tiên trên Google cho từ khóa "{{KEYWORD}}" sau:
+{{COMBINED_LINKS}}
+. Dựa trên thông tin tổng hợp, hãy tạo một dàn ý chi tiết cho một bài viết hoàn chỉnh, bao gồm các phần:
+1.  **Mở đầu:** Giới thiệu ngắn gọn về chủ đề và mục đích của bài viết.
+2.  **Nội dung chính:**
+    * Phân tích và so sánh các thông tin từ 3 kết quả tìm kiếm, bao gồm:
+        * Các khía cạnh chính được đề cập.
+        * Các điểm tương đồng và khác biệt giữa các nguồn.
+        * Các thông tin quan trọng và hữu ích.
+        * Các ví dụ minh họa (nếu có).
+    * Xác định các thông tin còn thiếu hoặc cần được làm rõ, và đề xuất các phần nội dung bổ sung để hoàn thiện bài viết.
+    * Phân loại thông tin nếu có thể, để bài viết có cấu trúc rõ ràng.
+3.  **Kết luận:** Tóm tắt các điểm chính, đưa ra kết luận hoặc khuyến nghị (nếu có)."
+4. ** Tuyệt đối Chỉ xuất ra nội dung chính, không dẫn dắt ok đây là hay giải thích gì thêm

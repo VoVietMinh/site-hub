@@ -1,0 +1,261 @@
+<style>
+.art-filters { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:16px; }
+.art-filters select, .art-filters input { padding:6px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; }
+.art-filters .btn { align-self:flex-end; }
+.gen-panel { background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; padding:16px; margin-bottom:16px; }
+.gen-panel h3 { margin:0 0 12px; font-size:14px; font-weight:600; }
+.gen-row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+.gen-row .form-group { flex:1; min-width:160px; margin:0; }
+.gen-row label { display:block; font-size:12px; color:#6b7280; margin-bottom:4px; }
+.gen-row input, .gen-row select { width:100%; padding:6px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; box-sizing:border-box; }
+#gen-result { margin-top:10px; font-size:13px; }
+.status-PENDING   { background:#f3f4f6; color:#6b7280; }
+.status-BUILDING  { background:#fef3c7; color:#d97706; }
+.status-READY     { background:#dbeafe; color:#1d4ed8; }
+.status-QUEUED    { background:#e0e7ff; color:#4338ca; }
+.status-PUBLISHING{ background:#fce7f3; color:#be185d; }
+.status-DONE      { background:#d1fae5; color:#065f46; }
+.status-FAILED    { background:#fee2e2; color:#b91c1c; }
+</style>
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Articles</h1>
+    <p class="page-subtitle">AI-generated WordPress articles across all sites</p>
+  </div>
+</div>
+
+<%# ── Keyword / article generator ─────────────────────────────────────────── %>
+<div class="gen-panel">
+  <h3>Generate Keywords</h3>
+  <div class="gen-row">
+    <div class="form-group">
+      <label>Site</label>
+      <select id="gen-site">
+        <option value="">— select site —</option>
+        <% sites.forEach(function(s) { %>
+        <option value="<%= s.id %>"><%= s.domain %></option>
+        <% }); %>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Topic</label>
+      <input id="gen-topic" type="text" placeholder="e.g. keto diet" />
+    </div>
+    <div class="form-group" style="max-width:90px;">
+      <label>Count</label>
+      <input id="gen-count" type="number" value="5" min="1" max="50" />
+    </div>
+    <button class="btn btn-primary" onclick="generateKeywords()">Generate</button>
+  </div>
+  <div id="gen-result"></div>
+</div>
+
+<%# ── Filters ──────────────────────────────────────────────────────────────── %>
+<form class="art-filters" method="get" action="/articles">
+  <select name="site_id">
+    <option value="">All Sites</option>
+    <% sites.forEach(function(s) { %>
+    <option value="<%= s.id %>" <%= filters.site_id == s.id ? 'selected' : '' %>><%= s.domain %></option>
+    <% }); %>
+  </select>
+  <select name="status">
+    <option value="">All Statuses</option>
+    <% ['PENDING','BUILDING','READY','QUEUED','PUBLISHING','DONE','FAILED'].forEach(function(st) { %>
+    <option value="<%= st %>" <%= filters.status === st ? 'selected' : '' %>><%= st %></option>
+    <% }); %>
+  </select>
+  <button type="submit" class="btn">Filter</button>
+  <a href="/articles" class="btn">Clear</a>
+</form>
+
+<%# ── Table ───────────────────────────────────────────────────────────────── %>
+<div class="card">
+  <% if (!articles.length) { %>
+    <div class="empty">No articles found. Use the generator above to create some.</div>
+  <% } else { %>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Keyword</th>
+        <th>Title</th>
+        <th>Site</th>
+        <th>Status</th>
+        <th>Created</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="articles-tbody">
+    <% articles.forEach(function(a) { %>
+      <tr id="art-row-<%= a.id %>">
+        <td class="muted">#<%= a.id %></td>
+        <td><%= a.keyword %></td>
+        <td class="muted" style="max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+          <%= a.title || '—' %>
+        </td>
+        <td class="muted"><%= a.site_domain || '—' %></td>
+        <td>
+          <span id="art-status-<%= a.id %>" class="tag status-<%= a.status %>"><%= a.status %></span>
+        </td>
+        <td class="muted"><%= a.created_at %></td>
+        <td>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <a class="btn btn-sm" href="/articles/<%= a.id %>">View</a>
+            <% if (a.status === 'PENDING' || a.status === 'FAILED') { %>
+              <button class="btn btn-sm btn-primary" onclick="buildArticle(<%= a.id %>, this)">
+                <%= a.status === 'FAILED' ? 'Retry' : 'Build' %>
+              </button>
+            <% } %>
+            <% if (a.status === 'READY') { %>
+              <button class="btn btn-sm" onclick="publishArticle(<%= a.id %>, this)">Publish</button>
+            <% } %>
+            <% if (a.wp_post_link) { %>
+              <a class="btn btn-sm" href="<%= a.wp_post_link %>" target="_blank" rel="noopener">View Post &rarr;</a>
+            <% } %>
+          </div>
+        </td>
+      </tr>
+    <% }); %>
+    </tbody>
+  </table>
+
+  <%# Pagination %>
+  <% if (articles.length === limit || page > 1) { %>
+  <div style="padding:12px 16px;display:flex;gap:8px;border-top:1px solid #e5e7eb;">
+    <% if (page > 1) { %>
+      <a class="btn btn-sm" href="?page=<%= page-1 %>&site_id=<%= filters.site_id||'' %>&status=<%= filters.status||'' %>">← Prev</a>
+    <% } %>
+    <span class="muted" style="line-height:28px;font-size:13px;">Page <%= page %></span>
+    <% if (articles.length === limit) { %>
+      <a class="btn btn-sm" href="?page=<%= page+1 %>&site_id=<%= filters.site_id||'' %>&status=<%= filters.status||'' %>">Next →</a>
+    <% } %>
+  </div>
+  <% } %>
+  <% } %>
+</div>
+
+<script>
+(function () {
+  var ACTIVE_POLLS = {};
+
+  function statusClass(s) {
+    return 'tag status-' + s;
+  }
+
+  function pollStatus(id) {
+    if (ACTIVE_POLLS[id]) return;
+    ACTIVE_POLLS[id] = setInterval(function () {
+      fetch('/articles/' + id + '/status')
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          var a = data.article;
+          if (!a) return;
+          var badge = document.getElementById('art-status-' + id);
+          if (badge) { badge.className = statusClass(a.status); badge.textContent = a.status; }
+          if (a.status !== 'BUILDING' && a.status !== 'PUBLISHING') {
+            clearInterval(ACTIVE_POLLS[id]);
+            delete ACTIVE_POLLS[id];
+            // Reload row actions by refreshing page
+            if (a.status === 'DONE' || a.status === 'FAILED' || a.status === 'READY') {
+              setTimeout(function () { window.location.reload(); }, 1000);
+            }
+          }
+        })
+        .catch(function () {});
+    }, 3000);
+  }
+
+  // Poll any in-flight articles on page load
+  document.querySelectorAll('[id^="art-status-"]').forEach(function (el) {
+    var s = el.textContent.trim();
+    if (s === 'BUILDING' || s === 'PUBLISHING') {
+      var id = el.id.replace('art-status-', '');
+      pollStatus(parseInt(id, 10));
+    }
+  });
+
+  window.buildArticle = function (id, btn) {
+    if (btn) { btn.disabled = true; btn.textContent = 'Starting…'; }
+    var isRetry = btn && btn.textContent.indexOf('Retry') >= 0;
+    var url = '/articles/' + id + (isRetry ? '/retry' : '/build');
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ publish_mode: 'immediate' })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.error) {
+          alert('Error: ' + data.error);
+          if (btn) { btn.disabled = false; btn.textContent = isRetry ? 'Retry' : 'Build'; }
+          return;
+        }
+        var badge = document.getElementById('art-status-' + id);
+        if (badge) { badge.className = 'tag status-BUILDING'; badge.textContent = 'BUILDING'; }
+        if (btn) btn.style.display = 'none';
+        pollStatus(id);
+      })
+      .catch(function (err) {
+        alert('Request failed: ' + err.message);
+        if (btn) { btn.disabled = false; btn.textContent = isRetry ? 'Retry' : 'Build'; }
+      });
+  };
+
+  window.publishArticle = function (id, btn) {
+    if (btn) { btn.disabled = true; btn.textContent = 'Publishing…'; }
+    fetch('/articles/' + id + '/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.error) {
+          alert('Error: ' + data.error);
+          if (btn) { btn.disabled = false; btn.textContent = 'Publish'; }
+          return;
+        }
+        var badge = document.getElementById('art-status-' + id);
+        if (badge) { badge.className = 'tag status-PUBLISHING'; badge.textContent = 'PUBLISHING'; }
+        if (btn) btn.style.display = 'none';
+        pollStatus(id);
+      })
+      .catch(function (err) {
+        alert('Request failed: ' + err.message);
+        if (btn) { btn.disabled = false; btn.textContent = 'Publish'; }
+      });
+  };
+
+  window.generateKeywords = function () {
+    var siteId = document.getElementById('gen-site').value;
+    var topic  = document.getElementById('gen-topic').value.trim();
+    var count  = document.getElementById('gen-count').value;
+    var result = document.getElementById('gen-result');
+
+    if (!siteId || !topic) {
+      result.innerHTML = '<span style="color:#dc2626;">Please select a site and enter a topic.</span>';
+      return;
+    }
+
+    result.innerHTML = '<span style="color:#6b7280;">Generating keywords…</span>';
+
+    fetch('/articles/keywords', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ site_id: siteId, topic: topic, count: count })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.error) {
+          result.innerHTML = '<span style="color:#dc2626;">Error: ' + data.error + '</span>';
+          return;
+        }
+        result.innerHTML = '<span style="color:#16a34a;">Created ' + data.created +
+          ' article(s). <a href="/articles?site_id=' + siteId + '">View them →</a></span>';
+      })
+      .catch(function (err) {
+        result.innerHTML = '<span style="color:#dc2626;">Request failed: ' + err.message + '</span>';
+      });
+  };
+}());
+</script>

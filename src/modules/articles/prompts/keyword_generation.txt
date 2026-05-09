@@ -1,0 +1,9 @@
+Hãy tạo một danh sách {{COUNT}} các cụm từ khóa dài (long-tail keywords) liên quan đến lĩnh vực/chủ đề: {{TOPIC}}, cách nhau bằng dấu |, không xuống dòng. Chỉ liệt kê danh sách các cụm từ khóa, không giải thích, không dẫn chứng.
+Các cụm từ khóa này nên có từ 3 từ trở lên, thể hiện ý định tìm kiếm cụ thể của người dùng và ít cạnh tranh hơn các từ khóa ngắn. Chúng nên bao gồm:
+- Các cụm từ khóa dài tập trung vào nhu cầu mua hoặc tìm kiếm sản phẩm/dịch vụ cụ thể liên quan đến {{TOPIC}}.
+- Các cụm từ khóa dài hướng đến việc tìm hiểu cách thực hiện một hành động hoặc giải quyết một vấn đề liên quan đến {{TOPIC}}.
+- Các cụm từ khóa dài chứa thông tin chi tiết, so sánh, đánh giá hoặc các thuộc tính cụ thể của {{TOPIC}}.
+- Sử dụng các từ để hỏi (như "làm thế nào", "ở đâu", "tại sao", "cái gì", "so sánh", "đánh giá") để tạo ra các cụm từ khóa dài tự nhiên theo cách người dùng tìm kiếm.
+Sau khi tạo danh sách, hãy ước tính lưu lượng tìm kiếm hàng tháng cho mỗi từ khóa (nếu có thể) hoặc đưa ra đánh giá về mức độ phổ biến tương đối của chúng.
+Cuối cùng, hãy sắp xếp danh sách các cụm từ khóa dài theo thứ tự giảm dần của lưu lượng tìm kiếm ước tính hoặc mức độ phổ biến, với các từ khóa có lưu lượng tìm kiếm cao nhất hoặc phổ biến nhất ở đầu danh sách.
+Đảm bảo danh sách các cụm từ khóa dài đa dạng, không quá trùng lặp và phản ánh nhiều mục đích tìm kiếm chi tiết khác nhau của người dùng đối với lĩnh vực/chủ đề {{TOPIC}}.

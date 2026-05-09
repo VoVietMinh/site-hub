@@ -48,4 +48,23 @@ async function remove(domain) {
   return execute('DELETE FROM sites WHERE domain = $1', [domain]);
 }
 
-module.exports = { findByDomain, findById, listAll, upsert, updateCredentials, remove };
+async function updateSiteSettings(id, fields) {
+  const allowed = ['default_status','image_source','drive_folder_id','default_tone','contact_info'];
+  const sets = [];
+  const params = [];
+  let i = 1;
+  for (const k of allowed) {
+    if (Object.prototype.hasOwnProperty.call(fields, k)) {
+      sets.push(k + ' = $' + i);
+      params.push(fields[k]);
+      i++;
+    }
+  }
+  if (!sets.length) return findById(id);
+  sets.push('updated_at = NOW()');
+  params.push(id);
+  await execute('UPDATE sites SET ' + sets.join(', ') + ' WHERE id = $' + i, params);
+  return findById(id);
+}
+
+module.exports = { findByDomain, findById, listAll, upsert, updateCredentials, remove, updateSiteSettings };

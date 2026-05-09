@@ -9,6 +9,7 @@
     <a href="/" class="<%= path === '/' ? 'active' : '' %>"><%= __('nav.dashboard') %></a>
     <a href="/sites" class="<%= path.startsWith('/sites') ? 'active' : '' %>"><%= __('nav.sites') %></a>
     <a href="/content" class="<%= path.startsWith('/content') ? 'active' : '' %>"><%= __('nav.content') %></a>
+    <a href="/articles" class="<%= path.startsWith('/articles') ? 'active' : '' %>">Articles</a>
     <a href="/logs" class="<%= path.startsWith('/logs') ? 'active' : '' %>"><%= __('nav.logs') %></a>
 
     <% if (currentUser && currentUser.role === 'SUPER_ADMIN') { %>

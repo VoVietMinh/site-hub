@@ -45,12 +45,26 @@ const config = {
   },
 
   ai: {
-    provider: process.env.AI_PROVIDER || 'mock',
-    apiKey:   process.env.AI_API_KEY  || ''
+    provider: process.env.AI_PROVIDER   || 'mock',
+    apiKey:   process.env.AI_API_KEY    || '',
+    model:    process.env.GEMINI_MODEL  || 'gemini-2.0-flash'
   },
 
   images: {
     serperApiKey: process.env.SERPER_API_KEY || ''
+  },
+
+  cse: {
+    apiKey: process.env.GOOGLE_CSE_API_KEY || '',
+    cx:     process.env.GOOGLE_CSE_CX      || ''
+  },
+
+  articles: {
+    defaultOutlineCount: parseInt(process.env.ARTICLE_DEFAULT_OUTLINE_COUNT, 10) || 9,
+    defaultTone:         process.env.ARTICLE_DEFAULT_TONE       || 'natural, humanize',
+    sectionWordsMin:     parseInt(process.env.ARTICLE_SECTION_WORDS_MIN, 10) || 500,
+    sectionWordsMax:     parseInt(process.env.ARTICLE_SECTION_WORDS_MAX, 10) || 700,
+    tagCreateDelayMs:    parseInt(process.env.TAG_CREATE_DELAY_MS, 10) || 3000
   },
 
   wpApiHost: process.env.WP_API_HOST || 'host.docker.internal'

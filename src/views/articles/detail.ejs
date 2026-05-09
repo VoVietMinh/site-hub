@@ -1,0 +1,299 @@
+<style>
+.art-meta-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin-bottom:16px; }
+.art-meta-item { background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px; padding:12px; }
+.art-meta-item label { display:block; font-size:11px; color:#6b7280; text-transform:uppercase; letter-spacing:.04em; margin-bottom:4px; }
+.art-meta-item span { font-size:14px; font-weight:500; }
+.status-PENDING   { background:#f3f4f6; color:#6b7280; }
+.status-BUILDING  { background:#fef3c7; color:#d97706; }
+.status-READY     { background:#dbeafe; color:#1d4ed8; }
+.status-QUEUED    { background:#e0e7ff; color:#4338ca; }
+.status-PUBLISHING{ background:#fce7f3; color:#be185d; }
+.status-DONE      { background:#d1fae5; color:#065f46; }
+.status-FAILED    { background:#fee2e2; color:#b91c1c; }
+.error-box { background:#fee2e2; border:1px solid #fecaca; border-radius:6px; padding:10px 14px; font-size:13px; color:#b91c1c; margin-bottom:16px; }
+.content-preview { background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:20px; max-height:500px; overflow-y:auto; font-size:14px; line-height:1.7; }
+.content-preview img { max-width:100%; height:auto; border-radius:4px; margin:12px 0; }
+.art-images { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; }
+.art-images img { width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:4px; border:1px solid #e5e7eb; }
+.build-panel { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+.build-panel select, .build-panel input[type=datetime-local] { padding:6px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; }
+.build-panel label { display:block; font-size:12px; color:#6b7280; margin-bottom:4px; }
+</style>
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title" id="art-title-heading"><%= article.title || article.keyword %></h1>
+    <p class="page-subtitle">
+      Article #<%= article.id %> &middot;
+      <% if (site) { %><%= site.domain %> &middot;<% } %>
+      <span id="art-status-badge" class="tag status-<%= article.status %>"><%= article.status %></span>
+    </p>
+  </div>
+  <a href="/articles<%= filters && filters.site_id ? '?site_id=' + filters.site_id : '' %>" class="btn">← Back</a>
+</div>
+
+<%# ── Error ───────────────────────────────────────────────────────────────── %>
+<% if (article.error_message) { %>
+<div class="error-box" id="art-error-box">
+  <strong>Error:</strong> <%= article.error_message %>
+</div>
+<% } else { %>
+<div class="error-box" id="art-error-box" style="display:none;"></div>
+<% } %>
+
+<%# ── Meta grid ───────────────────────────────────────────────────────────── %>
+<div class="art-meta-grid">
+  <div class="art-meta-item">
+    <label>Keyword</label>
+    <span><%= article.keyword %></span>
+  </div>
+  <div class="art-meta-item">
+    <label>Status</label>
+    <span id="art-status-text" class="tag status-<%= article.status %>"><%= article.status %></span>
+  </div>
+  <div class="art-meta-item">
+    <label>Publish Mode</label>
+    <span><%= article.publish_mode || 'immediate' %></span>
+  </div>
+  <div class="art-meta-item">
+    <label>Main Keyword</label>
+    <span id="art-main-kw"><%= article.main_keyword || '—' %></span>
+  </div>
+  <div class="art-meta-item">
+    <label>Tags</label>
+    <span>
+      <% var tags = article.tags ? (Array.isArray(article.tags) ? article.tags : JSON.parse(article.tags)) : []; %>
+      <%= tags.join(', ') || '—' %>
+    </span>
+  </div>
+  <div class="art-meta-item">
+    <label>Meta Description</label>
+    <span id="art-meta-desc" style="font-size:12px;"><%= article.meta_description || '—' %></span>
+  </div>
+  <% if (article.wp_post_link) { %>
+  <div class="art-meta-item">
+    <label>WordPress Post</label>
+    <span><a href="<%= article.wp_post_link %>" target="_blank" rel="noopener">View Post →</a></span>
+  </div>
+  <% } %>
+  <div class="art-meta-item">
+    <label>Retry Count</label>
+    <span><%= article.retry_count || 0 %></span>
+  </div>
+  <div class="art-meta-item">
+    <label>Created</label>
+    <span class="muted" style="font-size:12px;"><%= article.created_at %></span>
+  </div>
+</div>
+
+<%# ── Actions panel ───────────────────────────────────────────────────────── %>
+<div class="card" style="margin-bottom:16px;">
+  <div class="card-header"><h3>Actions</h3></div>
+  <div class="card-body">
+    <div class="build-panel" id="build-panel">
+
+      <% if (article.status === 'PENDING' || article.status === 'FAILED') { %>
+      <div>
+        <label>Publish Mode</label>
+        <select id="pub-mode" onchange="toggleScheduled()">
+          <option value="immediate">Immediate</option>
+          <option value="scheduled">Scheduled</option>
+        </select>
+      </div>
+      <div id="sched-wrap" style="display:none;">
+        <label>Scheduled At</label>
+        <input type="datetime-local" id="sched-at" />
+      </div>
+      <button class="btn btn-primary" onclick="doBuild()">
+        <%= article.status === 'FAILED' ? 'Retry Build' : 'Build Article' %>
+      </button>
+      <% } %>
+
+      <% if (article.status === 'READY') { %>
+      <button class="btn btn-primary" onclick="doPublish()">Publish to WordPress</button>
+      <% } %>
+
+      <% if (article.status === 'BUILDING' || article.status === 'PUBLISHING') { %>
+      <span class="muted" style="font-size:13px;" id="progress-label">
+        <%= article.status === 'BUILDING' ? 'Building…' : 'Publishing…' %>
+      </span>
+      <% } %>
+    </div>
+    <div id="action-msg" style="margin-top:8px;font-size:13px;"></div>
+  </div>
+</div>
+
+<%# ── Outline ─────────────────────────────────────────────────────────────── %>
+<% if (article.outline) { %>
+<div class="card" style="margin-bottom:16px;">
+  <div class="card-header"><h3>Outline</h3></div>
+  <div class="card-body">
+    <pre style="margin:0;font-size:13px;white-space:pre-wrap;color:#374151;"><%= article.outline %></pre>
+  </div>
+</div>
+<% } %>
+
+<%# ── Images ──────────────────────────────────────────────────────────────── %>
+<% if (artImages.length) { %>
+<div class="card" style="margin-bottom:16px;">
+  <div class="card-header"><h3>Images (<%= artImages.length %>)</h3></div>
+  <div class="card-body">
+    <div class="art-images">
+      <% artImages.forEach(function(img) { %>
+      <div>
+        <img src="<%= img.wp_media_url || img.source_url %>" alt="" loading="lazy" />
+        <% if (img.is_featured) { %><small class="muted">Featured</small><% } %>
+      </div>
+      <% }); %>
+    </div>
+  </div>
+</div>
+<% } %>
+
+<%# ── Content preview ────────────────────────────────────────────────────────%>
+<% if (article.content_html) { %>
+<div class="card" style="margin-bottom:16px;">
+  <div class="card-header"><h3>Content Preview</h3></div>
+  <div class="content-preview" id="art-content-preview">
+    <%- article.content_html %>
+  </div>
+</div>
+<% } else { %>
+<div id="art-content-preview-wrap" style="display:none;">
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-header"><h3>Content Preview</h3></div>
+    <div class="content-preview" id="art-content-preview"></div>
+  </div>
+</div>
+<% } %>
+
+<script>
+(function () {
+  var articleId = <%= article.id %>;
+  var pollTimer = null;
+
+  function statusClass(s) { return 'tag status-' + s; }
+
+  function setMsg(msg, isErr) {
+    var el = document.getElementById('action-msg');
+    if (el) { el.textContent = msg; el.style.color = isErr ? '#dc2626' : '#16a34a'; }
+  }
+
+  function updateUI(a) {
+    var badge = document.getElementById('art-status-badge');
+    var text  = document.getElementById('art-status-text');
+    if (badge) { badge.className = statusClass(a.status); badge.textContent = a.status; }
+    if (text)  { text.className  = statusClass(a.status); text.textContent  = a.status; }
+
+    var errBox = document.getElementById('art-error-box');
+    if (errBox) {
+      if (a.error_message) {
+        errBox.innerHTML = '<strong>Error:</strong> ' + a.error_message;
+        errBox.style.display = '';
+      } else {
+        errBox.style.display = 'none';
+      }
+    }
+
+    if (a.title) {
+      var h = document.getElementById('art-title-heading');
+      if (h) h.textContent = a.title;
+    }
+    if (a.main_keyword) {
+      var mk = document.getElementById('art-main-kw');
+      if (mk) mk.textContent = a.main_keyword;
+    }
+    if (a.meta_description) {
+      var md = document.getElementById('art-meta-desc');
+      if (md) md.textContent = a.meta_description;
+    }
+
+    var prog = document.getElementById('progress-label');
+    if (prog) {
+      if (a.status === 'BUILDING') { prog.style.display = ''; prog.textContent = 'Building…'; }
+      else if (a.status === 'PUBLISHING') { prog.style.display = ''; prog.textContent = 'Publishing…'; }
+      else { prog.style.display = 'none'; }
+    }
+
+    if (a.status === 'DONE' || a.status === 'FAILED' || a.status === 'READY') {
+      clearInterval(pollTimer);
+      pollTimer = null;
+      // Reload to show updated action buttons and content
+      setTimeout(function () { window.location.reload(); }, 1200);
+    }
+  }
+
+  function startPoll() {
+    if (pollTimer) return;
+    pollTimer = setInterval(function () {
+      fetch('/articles/' + articleId + '/status')
+        .then(function (r) { return r.json(); })
+        .then(function (data) { if (data.article) updateUI(data.article); })
+        .catch(function () {});
+    }, 3000);
+  }
+
+  // Auto-poll if in-flight
+  var status = '<%= article.status %>';
+  if (status === 'BUILDING' || status === 'PUBLISHING') {
+    startPoll();
+  }
+
+  window.toggleScheduled = function () {
+    var mode = document.getElementById('pub-mode');
+    var wrap = document.getElementById('sched-wrap');
+    if (mode && wrap) wrap.style.display = mode.value === 'scheduled' ? '' : 'none';
+  };
+
+  window.doBuild = function () {
+    var mode    = document.getElementById('pub-mode');
+    var schedAt = document.getElementById('sched-at');
+    var isRetry = '<%= article.status %>' === 'FAILED';
+    var url = '/articles/' + articleId + (isRetry ? '/retry' : '/build');
+    var body = { publish_mode: mode ? mode.value : 'immediate' };
+    if (schedAt && schedAt.value) body.scheduled_at = new Date(schedAt.value).toISOString();
+
+    setMsg('Starting…');
+
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.error) { setMsg('Error: ' + data.error, true); return; }
+        setMsg('Build started — polling for updates…');
+        var badge = document.getElementById('art-status-badge');
+        var text  = document.getElementById('art-status-text');
+        if (badge) { badge.className = 'tag status-BUILDING'; badge.textContent = 'BUILDING'; }
+        if (text)  { text.className  = 'tag status-BUILDING'; text.textContent  = 'BUILDING'; }
+        var panel = document.getElementById('build-panel');
+        if (panel) panel.innerHTML = '<span class="muted" style="font-size:13px;" id="progress-label">Building…</span>';
+        startPoll();
+      })
+      .catch(function (err) { setMsg('Request failed: ' + err.message, true); });
+  };
+
+  window.doPublish = function () {
+    setMsg('Publishing…');
+    fetch('/articles/' + articleId + '/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.error) { setMsg('Error: ' + data.error, true); return; }
+        setMsg('Publishing started…');
+        var badge = document.getElementById('art-status-badge');
+        var text  = document.getElementById('art-status-text');
+        if (badge) { badge.className = 'tag status-PUBLISHING'; badge.textContent = 'PUBLISHING'; }
+        if (text)  { text.className  = 'tag status-PUBLISHING'; text.textContent  = 'PUBLISHING'; }
+        var panel = document.getElementById('build-panel');
+        if (panel) panel.innerHTML = '<span class="muted" style="font-size:13px;" id="progress-label">Publishing…</span>';
+        startPoll();
+      })
+      .catch(function (err) { setMsg('Request failed: ' + err.message, true); });
+  };
+}());
+</script>

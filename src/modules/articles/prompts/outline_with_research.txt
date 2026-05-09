@@ -1,0 +1,4 @@
+Bỏ qua hết lời dẫn cùng giải thích đầu cuối, chỉ xuất ra văn bàn thuần túy. KHông tạo tiêu đề ,Không dùng các từ chung như mục lục, hay tiêu đề để đưa vào outline. Hãy tạo {{OUTLINE_COUNT}} outline để viết bài viết chuẩn seo cho từ khóa "{{KEYWORD}}" Dựa trên nội dung:
+{{RESEARCH_TEXT}}.
+Hãy đảm bảo từ khóa xuất hiện 1 lần trong từng outline.
+Chỉ đưa ra {{OUTLINE_COUNT}}  outline được đánh số thứ tự, mỗi outline là một dòng riêng biệt. Tuyệt đối không bao gồm bất kỳ phần giới thiệu, giải thích hoặc ký tự đặc biệt nào.

@@ -1,0 +1,1 @@
+Hãy phiên dịch ra tiếng anh cho từ khóa sau đây để dùng trong google search hình ảnh, giúp tìm ra các hình ảnh liên quan mật thiết với từ khóa:  {{KEYWORD}}. không cung cấp keyword có thể dẫn tới việc tìm ra các hình ảnh không liên quan tới từ khóa. Tuyệt đối Chỉ xuất ra nội dung chính, không dẫn dắt ok đây là hay giải thích gì thêm
