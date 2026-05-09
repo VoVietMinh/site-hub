@@ -15,16 +15,34 @@ pool.on('error', function (err) {
   console.error('PostgreSQL pool error:', err.message);
 });
 
+/**
+ * Convert a JavaScript Date to "YYYY-MM-DD HH:MM:SS" string (UTC).
+ * PostgreSQL returns TIMESTAMPTZ columns as Date objects; our views
+ * expect the SQLite-style string format so .split(' ')[0] etc. work.
+ */
+function dateToString(d) {
+  return d.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '');
+}
+
+function normaliseRow(row) {
+  if (!row || typeof row !== 'object') return row;
+  const out = {};
+  for (const key of Object.keys(row)) {
+    out[key] = row[key] instanceof Date ? dateToString(row[key]) : row[key];
+  }
+  return out;
+}
+
 /** Run a query; return all rows as an array. */
 async function query(sql, params) {
   const result = await pool.query(sql, params);
-  return result.rows;
+  return result.rows.map(normaliseRow);
 }
 
 /** Run a query; return the first row or null. */
 async function queryOne(sql, params) {
   const result = await pool.query(sql, params);
-  return result.rows[0] || null;
+  return normaliseRow(result.rows[0] || null);
 }
 
 /** Run an INSERT / UPDATE / DELETE; return the pg result object. */
