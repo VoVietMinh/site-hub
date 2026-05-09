@@ -235,7 +235,6 @@
     }
   });
 
-  // Escape </script> so it cannot prematurely close this script block
   var initialHtml = <%- JSON.stringify(keyword.content || '').replace(/<\//g, '<\\/') %>;
   if (initialHtml) quill.clipboard.dangerouslyPasteHTML(initialHtml);
 
