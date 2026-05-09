@@ -26,9 +26,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const config = require('../config');
 
-const FILE = path.join(path.dirname(config.db.path), 'site-template.json');
+const FILE = path.join(process.cwd(), 'data', 'site-template.json');
 
 const DEFAULT = Object.freeze({
   theme: 'newspare',
