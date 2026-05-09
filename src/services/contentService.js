@@ -208,16 +208,34 @@ function mockImages(keyword, count) {
 
 /**
  * Obtain a JWT token.
- * POST /wp-json/jwt-auth/v1/token
+ * POST /wp-json/api/v1/token  (JWT Auth plugin — returns { jwt_token, token_type, ... })
+ * Falls back to /wp-json/jwt-auth/v1/token (older plugin variant).
  */
 async function getWpToken(domain, ssl, username, password) {
-  var resp = await axios.post(
-    wpBase(ssl) + '/wp-json/jwt-auth/v1/token',
-    { username: username, password: password },
-    wpCfg(domain, ssl, { 'Content-Type': 'application/json' })
-  );
-  var token = resp.data && resp.data.token;
-  if (!token) throw new Error('JWT token not returned by ' + domain + '. Is the JWT Authentication for WP-API plugin active?');
+  var body = { username: username, password: password };
+  var cfg  = wpCfg(domain, ssl, { 'Content-Type': 'application/json' });
+
+  // Try primary endpoint first
+  var resp;
+  try {
+    resp = await axios.post(wpBase(ssl) + '/wp-json/api/v1/token', body, cfg);
+  } catch (primaryErr) {
+    // Fall back to the older jwt-auth plugin endpoint
+    try {
+      resp = await axios.post(wpBase(ssl) + '/wp-json/jwt-auth/v1/token', body, cfg);
+    } catch (_) {
+      throw primaryErr; // surface the primary error
+    }
+  }
+
+  // Response may use jwt_token (new plugin) or token (older plugin)
+  var token = (resp.data && (resp.data.jwt_token || resp.data.token)) || null;
+  if (!token) {
+    throw new Error(
+      'JWT token not returned by ' + domain +
+      '. Ensure the JWT Auth plugin (/wp-json/api/v1/token) is active and credentials are correct.'
+    );
+  }
   return token;
 }
 
