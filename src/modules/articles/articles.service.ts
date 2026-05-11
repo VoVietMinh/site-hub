@@ -342,7 +342,7 @@ export function stitchHtml(
     const img = imageData?.[i];
     if (img?.url) {
       const a = escHtml(img.alt || '');
-      html += '<div class="image-section"><img src="' + img.url + '" alt="' + a + '" title="' + a + '"></div>';
+      html += '<div class="image-section"><img src="' + img.url + '" alt="' + a + '" title="' + a + '" width="100%"></div>';
     }
   }
   return html;
