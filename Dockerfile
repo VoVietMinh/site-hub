@@ -15,7 +15,8 @@ RUN npm install
 # Copy source and compile
 COPY . .
 RUN npm run build \
- && cp src/services/contentService.js dist/services/contentService.js
+ && cp -r src/modules/articles/prompts dist/modules/articles/prompts \
+ && cp src/services/contentService.js dist/services/contentService.js 2>/dev/null || true
 
 # ── Stage 2: Production image ─────────────────────────────────────────────────
 FROM node:20-bookworm-slim AS runner
@@ -35,7 +36,7 @@ RUN npm install --omit=dev
 COPY --from=builder /app/dist       ./dist
 COPY --from=builder /app/src/views  ./src/views
 COPY --from=builder /app/src/public ./src/public
-COPY --from=builder /app/src/modules/articles/prompts ./src/modules/articles/prompts
+COPY --from=builder /app/dist/modules/articles/prompts ./dist/modules/articles/prompts
 COPY --from=builder /app/src/i18n/locales ./src/i18n/locales
 
 RUN mkdir -p /app/data /app/logs
