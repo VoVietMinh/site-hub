@@ -355,6 +355,8 @@ export interface PublishOpts {
   siteId?:     number | null;
   /** Override category (defaults to article.category_id) */
   categoryId?: number | null;
+  /** WP post status override: 'publish' | 'draft' | 'pending' | 'private' */
+  wpStatus?:   string;
 }
 
 export async function publishArticle(articleId: number, opts: PublishOpts = {}): Promise<void> {
@@ -405,15 +407,45 @@ export async function publishArticle(articleId: number, opts: PublishOpts = {}):
                         article.scheduled_at &&
                         new Date(article.scheduled_at as string) > new Date();
 
+    // Resolve WP post status: explicit opts override → site default → 'publish'
+    const VALID_WP_STATUSES = ['publish', 'draft', 'pending', 'private'];
+    const resolvedStatus = isScheduled
+      ? 'future'
+      : (opts.wpStatus && VALID_WP_STATUSES.includes(opts.wpStatus)
+          ? opts.wpStatus
+          : ((site.default_status as string | undefined) ?? 'publish'));
+
     payload = {
       title:   article.title ?? article.keyword,
       content: article.content_html ?? '',
-      status:  isScheduled ? 'future' : ((site.default_status as string | undefined) ?? 'publish'),
+      status:  resolvedStatus,
     };
     if (isScheduled) payload['date_gmt'] = new Date(article.scheduled_at as string).toISOString().replace(/\.\d{3}Z$/, '');
-    if (tagIds.length)          payload['tags']       = tagIds;
-    if (targetCategoryId)       payload['categories'] = [targetCategoryId];
-    if (article.featured_media_id) payload['featured_media'] = article.featured_media_id;
+    if (tagIds.length)    payload['tags']       = tagIds;
+    if (targetCategoryId) payload['categories'] = [targetCategoryId];
+
+    // --- Featured image: upload first image to WP media library ---
+    let featuredMediaId: number | null = null;
+    try {
+      const artImgs = await repo.listImagesForArticle(articleId);
+      const featImg = artImgs.find((i) => i.is_featured) ?? artImgs[0] ?? null;
+      const imgUrl  = (featImg?.wp_media_url ?? featImg?.source_url ?? null) as string | null;
+      if (imgUrl) {
+        const imgResp = await (await import('axios')).default.get(imgUrl, { responseType: 'arraybuffer', timeout: 15000 });
+        const rawExt  = ((imgUrl.split('?')[0] ?? '').split('.').pop() ?? 'jpg').toLowerCase();
+        const ext     = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(rawExt) ? rawExt : 'jpg';
+        const ct      = 'image/' + (ext === 'jpg' ? 'jpeg' : ext);
+        const fname   = 'featured-' + String(articleId) + '.' + ext;
+        const media   = await wp.uploadMedia(Buffer.from(imgResp.data as ArrayBuffer), fname, ct);
+        featuredMediaId = media.id;
+        await logRepo.write({ level: 'info', category: 'articles',
+          message: 'Article #' + String(articleId) + ' featured image uploaded: media_id=' + String(media.id) });
+      }
+    } catch (feErr) {
+      await logRepo.write({ level: 'warn', category: 'articles',
+        message: 'Article #' + String(articleId) + ' featured image upload skipped: ' + (feErr as Error).message });
+    }
+    if (featuredMediaId) payload['featured_media'] = featuredMediaId;
     if (article.main_keyword || article.meta_description) {
       payload['meta'] = {};
       if (article.main_keyword)     (payload['meta'] as Record<string, unknown>)['_yoast_wpseo_focuskw']  = article.main_keyword;
