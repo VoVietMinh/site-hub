@@ -32,12 +32,12 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install --omit=dev
 
-# Copy compiled output + static assets
-COPY --from=builder /app/dist       ./dist
-COPY --from=builder /app/src/views  ./src/views
-COPY --from=builder /app/src/public ./src/public
+# Copy compiled output + non-TS assets into dist/ (mirrors __dirname at runtime)
+COPY --from=builder /app/dist                        ./dist
+COPY --from=builder /app/src/views                   ./dist/views
+COPY --from=builder /app/src/public                  ./dist/public
+COPY --from=builder /app/src/i18n/locales            ./dist/i18n/locales
 COPY --from=builder /app/dist/modules/articles/prompts ./dist/modules/articles/prompts
-COPY --from=builder /app/src/i18n/locales ./src/i18n/locales
 
 RUN mkdir -p /app/data /app/logs
 
