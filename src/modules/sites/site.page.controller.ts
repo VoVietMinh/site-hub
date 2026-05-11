@@ -65,12 +65,14 @@ export const detail = asyncHandler(async (req: Request, res: Response) => {
 export const updateCredentials = asyncHandler(async (req: Request, res: Response) => {
   const domain = req.params['domain']!;
   v.assertDomain(domain);
-  const body = req.body as { wp_user?: string; wp_pass?: string; direct_connect?: string; _direct_only?: string };
+  const body = req.body as { wp_user?: string; wp_pass?: string; direct_connect?: string; ssl?: string; _direct_only?: string; _ssl_only?: string };
   const { wp_user = '', wp_pass = '' } = body;
-  // direct_connect checkbox sends '1' when checked, absent when unchecked
+  // checkboxes send '1' when checked, absent when unchecked
   const direct_connect = body.direct_connect === '1';
-  await service.updateCredentials(domain, wp_user, wp_pass, direct_connect);
-  req.flash('success', body._direct_only ? 'Connection settings updated' : 'WordPress API credentials saved');
+  // ssl toggle: only set when the _ssl_only hidden flag is present (so main credential saves don't accidentally clear ssl)
+  const ssl = body._ssl_only !== undefined ? body.ssl === '1' : undefined;
+  await service.updateCredentials(domain, wp_user, wp_pass, direct_connect, ssl);
+  req.flash('success', body._ssl_only ? 'SSL setting updated' : (body._direct_only ? 'Connection settings updated' : 'WordPress API credentials saved'));
   res.redirect('/sites/' + encodeURIComponent(domain));
 });
 

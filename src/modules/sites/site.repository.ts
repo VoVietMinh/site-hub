@@ -50,7 +50,8 @@ export async function updateCredentials(
   domain: string,
   wp_user: string | null,
   wp_pass: string | null,
-  direct_connect?: boolean
+  direct_connect?: boolean,
+  ssl?: boolean
 ): Promise<Site | null> {
   const sets: string[] = ['updated_at = NOW()'];
   const params: unknown[] = [];
@@ -67,6 +68,10 @@ export async function updateCredentials(
   if (direct_connect !== undefined) {
     params.push(direct_connect);
     sets.push('direct_connect = $' + params.length);
+  }
+  if (ssl !== undefined) {
+    params.push(ssl);
+    sets.push('ssl = $' + params.length);
   }
   params.push(domain);
   await execute(

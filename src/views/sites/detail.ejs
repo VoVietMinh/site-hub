@@ -185,6 +185,21 @@
         <input type="hidden" name="_direct_only" value="1" />
       </form>
     </div>
+
+    <%# SSL toggle — controls whether API calls use http:// or https:// %>
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid #e5e7eb;">
+      <form method="post" action="/sites/<%= encodeURIComponent(domain) %>/credentials" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+          <input type="checkbox" name="ssl" value="1"
+            <%= local && local.ssl ? 'checked' : '' %>
+            onchange="this.form.submit()" />
+          <span><strong>SSL (HTTPS)</strong> — use <code>https://</code> for all API calls to this site</span>
+        </label>
+        <span class="muted" style="font-size:12px;">Uncheck to use <code>http://</code> — useful when the site does not have a valid SSL certificate.</span>
+        <input type="hidden" name="wp_user" value="<%= (local && local.wp_user) || '' %>" />
+        <input type="hidden" name="_ssl_only" value="1" />
+      </form>
+    </div>
   </div>
 </div>
 

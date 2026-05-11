@@ -127,10 +127,10 @@ export async function createFull(params: CreateFullParams): Promise<{
 }
 
 export async function updateCredentials(
-  domain: string, wp_user: string, wp_pass: string, direct_connect?: boolean
+  domain: string, wp_user: string, wp_pass: string, direct_connect?: boolean, ssl?: boolean
 ): Promise<Site | null> {
   v.assertDomain(domain);
-  return repo.updateCredentials(domain, wp_user || null, wp_pass || null, direct_connect);
+  return repo.updateCredentials(domain, wp_user || null, wp_pass || null, direct_connect, ssl);
 }
 
 export async function remove(domain: string, userId?: number | null): Promise<boolean> {
