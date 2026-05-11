@@ -310,7 +310,7 @@
     setCatStatus('Loading categories from WordPress\u2026', false);
     if (catCount) catCount.textContent = '';
 
-    fetch('/content/' + JOB_ID + '/categories')
+    fetch('/api/content/' + JOB_ID + '/categories')
       .then(function (r) { return r.json(); })
       .then(function (data) {
         var cats = data.categories || [];
@@ -369,7 +369,7 @@
     if (connLabel) connLabel.textContent = 'Checking\u2026';
     if (connInfo) connInfo.style.display = 'none';
 
-    fetch('/content/' + JOB_ID + '/check-connection')
+    fetch('/api/content/' + JOB_ID + '/check-connection')
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (d.ok) {

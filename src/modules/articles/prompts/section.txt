@@ -1,26 +1,43 @@
-Hãy viết một đoạn nội dung chuẩn SEO dài khoảng 500-700 từ bằng tiếng Việt cho tiêu đề H2 sau:
+Hãy viết một đoạn nội dung chuẩn SEO dài khoảng 500-700 từ bằng {{LANGUAGE}} cho tiêu đề H2 sau:
 <h2>{{OUTLINE}}</h2>
 Đây là tiêu đề H2 trong bài viết với cấu trúc outline đầy đủ như sau:
 {{FULL_OUTLINE}}
 Từ khóa chính của bài viết là: {{KEYWORD}}
+
+Bạn viết với vai trò chuyên gia có kinh nghiệm thực tế, tuân thủ nguyên tắc E-E-A-T (Experience, Expertise, Authoritativeness, Trustworthiness).
+
 Yêu cầu:
-- Phát triển nội dung chi tiết và chuyên sâu cho tiêu đề H2 "{{OUTLINE}}".
-- Tạo cấu trúc nội dung rõ ràng bằng cách sử dụng các heading cấp thấp hơn (H3, H4 nếu cần) và các đoạn văn bản `<p>`.
-- Khai thác các khía cạnh khác nhau, cung cấp thông tin chi tiết, ví dụ, hoặc giải thích để làm rõ ý cho tiêu đề H2.
+- Phát triển nội dung chi tiết, chuyên sâu cho tiêu đề H2 "{{OUTLINE}}", có góc nhìn thực tế (ví dụ cụ thể, tình huống thường gặp, lưu ý từ kinh nghiệm) thay vì nói chung chung.
+- Đưa ra dữ liệu, con số, hoặc định nghĩa kỹ thuật khi phù hợp. Với khẳng định mạnh (ví dụ "tốt nhất", "an toàn nhất") phải kèm điều kiện hoặc lưu ý, tránh tuyên bố tuyệt đối không căn cứ.
+- Tạo cấu trúc rõ ràng bằng heading cấp thấp hơn (H3, H4 nếu cần) và đoạn văn `<p>` ngắn 2-4 câu.
+- Bắt buộc dùng TỐI THIỂU MỘT trong các thành phần định dạng nâng cao sau (chọn cái phù hợp nội dung, không ép dùng hết):
+  • `<table>` với `<thead>`, `<tbody>`, `<tr>`, `<th>`, `<td>` — bắt buộc khi nội dung là so sánh, đánh giá theo nhiều tiêu chí, thông số, hoặc bảng giá. Tối thiểu 3 hàng.
+  • `<ul>` hoặc `<ol>` — khi liệt kê 3+ điểm song song hoặc các bước theo thứ tự.
+  • `<blockquote>` (có thể kèm `<cite>`) — khi trích lời chuyên gia, định nghĩa quan trọng, hoặc nhấn mạnh quan điểm.
+- Dùng `<strong>` để nhấn mạnh từ khóa hoặc điểm chính (1-3 lần mỗi phần, không lạm dụng).
+- Chèn 1-2 backlink ngoài đến nguồn uy tín (Wikipedia, trang chính phủ .gov, tổ chức quốc tế như WHO, hoặc cơ quan báo chí lớn) bằng thẻ `<a href="..." rel="noopener" target="_blank">anchor text mô tả</a>`. Chỉ chèn khi nguồn thực sự liên quan đến điểm đang nói. Anchor text phải mô tả nội dung trang đích, không dùng "tại đây" hay "click vào đây". URL phải có thật và đến trang còn tồn tại.
+- Khai thác các khía cạnh khác nhau, cung cấp thông tin chi tiết, ví dụ hoặc giải thích để làm rõ ý cho tiêu đề H2.
 - Đảm bảo nội dung bao gồm các ý chính liên quan đến tiêu đề H2 trong outline đầy đủ.
-- Chèn từ khóa chính một cách tự nhiên trong suốt nội dung, bao gồm cả trong các heading cấp thấp hơn (nếu phù hợp).
+- Chèn từ khóa chính một cách tự nhiên trong suốt nội dung (2-3 lần), bao gồm cả trong các heading cấp thấp hơn (nếu phù hợp).
 - Đảm bảo nội dung không trùng lặp với các phần khác của bài viết (tham khảo outline đầy đủ).
 - Sử dụng giọng văn {{TONE}} tự nhiên.
 - Nếu cần lấy thông tin về chủ thể kinh doanh, thương hiệu, và địa chỉ liên hệ hãy lấy nội dung: {{CONTACT_INFO}}
-- Kết quả trả về phải là một đoạn mã HTML hoàn chỉnh, bắt đầu bằng thẻ `<h2>` chứa tiêu đề, và tiếp theo là các thẻ `<h3>`, `<h4>` (nếu có) và các đoạn văn `<p>` chứa nội dung chi tiết. **Tuyệt đối không có bất kỳ ký tự hoặc câu giới thiệu nào bên ngoài đoạn mã HTML này.**
-- Không sử dụng dấu markdown ** ở bất cứ đâu
+- Kết quả trả về phải là một đoạn mã HTML hoàn chỉnh, bắt đầu bằng thẻ `<h2>` chứa tiêu đề, và tiếp theo là các thẻ `<h3>`, `<h4>` (nếu có), các đoạn văn `<p>`, cùng các thành phần định dạng nâng cao ở trên. **Tuyệt đối không có bất kỳ ký tự hoặc câu giới thiệu nào bên ngoài đoạn mã HTML này.**
+- Không sử dụng dấu markdown ** ở bất cứ đâu, không kèm ```html``` fence.
+
 Ví dụ về định dạng đầu ra mong muốn:
 <h2>{{OUTLINE}}</h2>
 <p>Đoạn mở đầu giới thiệu về chủ đề của tiêu đề H2.</p>
 <h3>Tiêu đề H3 thứ nhất: Một khía cạnh của {{OUTLINE}}</h3>
-<p>Giải thích chi tiết về khía cạnh này.</p>
+<p>Giải thích chi tiết, có thể dẫn nguồn: theo <a href="https://en.wikipedia.org/wiki/..." rel="noopener" target="_blank">tên nguồn</a>, ...</p>
+<blockquote>"Trích dẫn quan trọng từ chuyên gia hoặc nguồn uy tín." <cite>— Tên nguồn</cite></blockquote>
 <h4>Tiêu đề H4: Một điểm nhỏ hơn</h4>
 <p>Thông tin chi tiết hơn về điểm nhỏ này.</p>
-<h3>Tiêu đề H3 thứ hai: Một khía cạnh khác</h3>
-<p>Giải thích và ví dụ cho khía cạnh này.</p>
-<p>Kết luận hoặc tóm tắt cho phần H2 này.</p>
+<h3>Tiêu đề H3 thứ hai: So sánh các lựa chọn</h3>
+<table>
+  <thead><tr><th>Tiêu chí</th><th>Lựa chọn A</th><th>Lựa chọn B</th></tr></thead>
+  <tbody>
+    <tr><td>...</td><td>...</td><td>...</td></tr>
+  </tbody>
+</table>
+<p>Kết luận phần này, nhấn mạnh điểm chính bằng <strong>từ khóa nhấn mạnh</strong>.</p>

@@ -1,0 +1,45 @@
+Hãy viết một đoạn nội dung chuẩn SEO dài khoảng 500-700 từ bằng {{LANGUAGE}} cho tiêu đề H2 sau:
+<h2>{{OUTLINE}}</h2>
+Đây là tiêu đề H2 trong bài viết với cấu trúc outline đầy đủ như sau:
+{{FULL_OUTLINE}}
+Từ khóa chính của bài viết là: {{KEYWORD}}
+
+Nguồn tham khảo uy tín được phép trích dẫn (CHỈ dùng URL trong danh sách, KHÔNG bịa):
+{{EXTERNAL_LINKS_JSON}}
+
+Yêu cầu:
+- Viết theo nguyên tắc E-E-A-T: thể hiện kinh nghiệm thực tế (ví dụ cụ thể, lưu ý từ trải nghiệm), chuyên môn (số liệu, định nghĩa rõ ràng), thẩm quyền (trích dẫn 1-2 nguồn uy tín), và đáng tin cậy (khẳng định mạnh phải kèm điều kiện).
+- Phát triển nội dung chi tiết và chuyên sâu cho tiêu đề H2 "{{OUTLINE}}".
+- Tạo cấu trúc rõ ràng với heading cấp thấp hơn (H3, H4 nếu cần) và đoạn văn `<p>`.
+- Bắt buộc dùng TỐI THIỂU MỘT trong các thành phần định dạng nâng cao sau, chọn cái phù hợp với nội dung:
+  • `<table>` với `<thead>/<tbody>` khi so sánh, đánh giá nhiều tiêu chí, hoặc trình bày thông số (3-8 hàng).
+  • `<ul>` hoặc `<ol>` khi liệt kê 3+ điểm hoặc các bước.
+  • `<blockquote>` (có thể kèm `<cite>`) khi trích lời chuyên gia hoặc nhấn mạnh quan điểm.
+- Chèn 1-3 liên kết ngoài `<a href="..." rel="noopener" target="_blank">anchor mô tả</a>` đến nguồn trong {{EXTERNAL_LINKS_JSON}}. Anchor text phải mô tả nội dung trang đích, không dùng "tại đây". Tuyệt đối không bịa URL.
+- Dùng `<strong>` để nhấn từ khóa hoặc điểm quan trọng (1-3 lần, không lạm dụng).
+- Khai thác các khía cạnh khác nhau, cung cấp thông tin chi tiết, ví dụ, hoặc giải thích để làm rõ ý cho tiêu đề H2.
+- Đảm bảo nội dung bao gồm các ý chính liên quan đến tiêu đề H2 trong outline đầy đủ.
+- Chèn từ khóa chính một cách tự nhiên (2-3 lần) trong suốt nội dung, bao gồm cả trong các heading cấp thấp hơn (nếu phù hợp).
+- Đảm bảo nội dung không trùng lặp với các phần khác của bài viết (tham khảo outline đầy đủ).
+- Sử dụng giọng văn {{TONE}} tự nhiên.
+- Nếu cần lấy thông tin về chủ thể kinh doanh, thương hiệu, và địa chỉ liên hệ hãy lấy nội dung: {{CONTACT_INFO}}
+- Kết quả trả về phải là một đoạn mã HTML hoàn chỉnh, bắt đầu bằng thẻ `<h2>` chứa tiêu đề, và tiếp theo là các thẻ `<h3>`, `<h4>` (nếu có), các đoạn văn `<p>`, và các thành phần định dạng nâng cao kể trên. **Tuyệt đối không có bất kỳ ký tự hoặc câu giới thiệu nào bên ngoài đoạn mã HTML này.**
+- Không sử dụng dấu markdown ** ở bất cứ đâu.
+
+Ví dụ về định dạng đầu ra mong muốn:
+<h2>{{OUTLINE}}</h2>
+<p>Đoạn mở đầu giới thiệu về chủ đề của tiêu đề H2.</p>
+<h3>Tiêu đề H3 thứ nhất: Một khía cạnh của {{OUTLINE}}</h3>
+<p>Giải thích chi tiết, có thể dẫn nguồn từ <a href="..." rel="noopener" target="_blank">tên nguồn</a>.</p>
+<blockquote>"Trích dẫn quan trọng làm rõ điểm này." <cite>— Tên nguồn</cite></blockquote>
+<h4>Tiêu đề H4: Một điểm nhỏ hơn</h4>
+<p>Thông tin chi tiết hơn về điểm nhỏ này.</p>
+<h3>Tiêu đề H3 thứ hai: So sánh các lựa chọn</h3>
+<table>
+  <thead><tr><th>Tiêu chí</th><th>A</th><th>B</th></tr></thead>
+  <tbody>
+    <tr><td>Giá</td><td>...</td><td>...</td></tr>
+    <tr><td>Ưu điểm</td><td>...</td><td>...</td></tr>
+  </tbody>
+</table>
+<p>Kết luận hoặc tóm tắt cho phần H2 này, nhấn mạnh <strong>điểm chính</strong>.</p>

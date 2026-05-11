@@ -1,54 +1,166 @@
 <style>
-.art-filters { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:16px; }
-.art-filters select, .art-filters input { padding:6px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; }
-.art-filters .btn { align-self:flex-end; }
-.gen-panel { background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; padding:16px; margin-bottom:16px; }
-.gen-panel h3 { margin:0 0 12px; font-size:14px; font-weight:600; }
-.gen-row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
-.gen-row .form-group { flex:1; min-width:160px; margin:0; }
-.gen-row label { display:block; font-size:12px; color:#6b7280; margin-bottom:4px; }
-.gen-row input, .gen-row select { width:100%; padding:6px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; box-sizing:border-box; }
-#gen-result { margin-top:10px; font-size:13px; }
+/* ── Status tags ──────────────────────────────────────────────────────────── */
 .status-PENDING   { background:#f3f4f6; color:#6b7280; }
 .status-BUILDING  { background:#fef3c7; color:#d97706; }
-.status-READY     { background:#dbeafe; color:#1d4ed8; }
 .status-QUEUED    { background:#e0e7ff; color:#4338ca; }
+.status-READY     { background:#dbeafe; color:#1d4ed8; }
 .status-PUBLISHING{ background:#fce7f3; color:#be185d; }
 .status-DONE      { background:#d1fae5; color:#065f46; }
 .status-FAILED    { background:#fee2e2; color:#b91c1c; }
+
+/* ── Create manual panel ─────────────────────────────────────────────────── */
+.create-panel { background:#f0f9ff; border:1px solid #bae6fd; border-radius:10px; padding:18px 20px; margin-bottom:20px; }
+.create-panel h3 { margin:0 0 12px; font-size:15px; font-weight:600; color:#0c4a6e; }
+
+/* ── Generator panel ──────────────────────────────────────────────────────── */
+.gen-panel { background:#f9fafb; border:1px solid #e5e7eb; border-radius:10px; padding:20px; margin-bottom:20px; }
+.gen-panel h3 { margin:0 0 14px; font-size:15px; font-weight:600; color:#111827; }
+.gen-row { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
+.gen-row .fg { flex:1; min-width:150px; margin:0; }
+.gen-row .fg-sm { flex:0 0 100px; margin:0; }
+.gen-row label { display:block; font-size:12px; color:#6b7280; font-weight:500; margin-bottom:5px; }
+.gen-row input, .gen-row select { width:100%; padding:7px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; box-sizing:border-box; background:#fff; }
+.gen-row input:focus, .gen-row select:focus { outline:none; border-color:#6366f1; box-shadow:0 0 0 3px rgba(99,102,241,.1); }
+
+/* ── Progress cards ───────────────────────────────────────────────────────── */
+#gen-cards { display:flex; flex-wrap:wrap; gap:10px; margin-top:16px; }
+.gen-card {
+  flex:0 0 calc(50% - 5px);
+  min-width:200px;
+  background:#fff;
+  border:1px solid #e5e7eb;
+  border-radius:8px;
+  padding:12px;
+  font-size:13px;
+  transition:border-color .2s;
+}
+@media(max-width:600px){ .gen-card{ flex:0 0 100%; } }
+.gen-card.card-building { border-color:#f59e0b; background:#fffbeb; }
+.gen-card.card-done     { border-color:#10b981; background:#f0fdf4; }
+.gen-card.card-failed   { border-color:#ef4444; background:#fef2f2; }
+.gen-card-kw { font-weight:600; color:#111827; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.gen-card-step { display:flex; align-items:center; gap:6px; color:#6b7280; font-size:12px; }
+.spin { display:inline-block; width:12px; height:12px; border:2px solid #d1d5db; border-top-color:#6366f1; border-radius:50%; animation:spin .7s linear infinite; flex-shrink:0; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.gen-card-actions { margin-top:8px; display:flex; gap:6px; }
+
+/* ── Build progress stepper (on cards & detail) ───────────────────────────── */
+.step-list { display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; }
+.step-pill {
+  padding:2px 8px; border-radius:12px; font-size:11px; font-weight:500;
+  background:#f3f4f6; color:#9ca3af; border:1px solid #e5e7eb;
+}
+.step-pill.done  { background:#d1fae5; color:#065f46; border-color:#6ee7b7; }
+.step-pill.active{ background:#fef3c7; color:#d97706; border-color:#fde68a; }
+
+/* ── Filters ──────────────────────────────────────────────────────────────── */
+.art-filters { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:16px; }
+.art-filters select { padding:6px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; background:#fff; }
 </style>
 
 <div class="page-header">
   <div>
     <h1 class="page-title">Articles</h1>
-    <p class="page-subtitle">AI-generated WordPress articles across all sites</p>
+    <p class="page-subtitle">AI-generated WordPress articles</p>
   </div>
 </div>
 
-<%# ── Keyword / article generator ─────────────────────────────────────────── %>
-<div class="gen-panel">
-  <h3>Generate Keywords</h3>
+<%# ── Manual Create ──────────────────────────────────────────────────────────── %>
+<div class="create-panel">
+  <h3>✏️ Create Article Manually</h3>
   <div class="gen-row">
-    <div class="form-group">
-      <label>Site</label>
-      <select id="gen-site">
-        <option value="">— select site —</option>
+    <div class="fg">
+      <label>Keyword <span style="color:#dc2626;">*</span></label>
+      <input id="mc-keyword" type="text" placeholder="e.g. best keto recipes" />
+    </div>
+    <div class="fg">
+      <label>Title <span style="color:#9ca3af;font-weight:400;">(optional)</span></label>
+      <input id="mc-title" type="text" placeholder="Leave blank to auto-generate on build" />
+    </div>
+    <div class="fg-sm" style="flex:0 0 140px;">
+      <label>Language</label>
+      <select id="mc-lang">
+        <option value="English" selected>English</option>
+        <option value="Vietnamese">Vietnamese</option>
+        <option value="Spanish">Spanish</option>
+        <option value="French">French</option>
+        <option value="German">German</option>
+        <option value="Indonesian">Indonesian</option>
+        <option value="Thai">Thai</option>
+        <option value="Portuguese">Portuguese</option>
+        <option value="Italian">Italian</option>
+        <option value="Japanese">Japanese</option>
+        <option value="Korean">Korean</option>
+        <option value="Chinese">Chinese</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>Site <span style="color:#9ca3af;font-weight:400;">(optional)</span></label>
+      <select id="mc-site">
+        <option value="">— assign later —</option>
         <% sites.forEach(function(s) { %>
         <option value="<%= s.id %>"><%= s.domain %></option>
         <% }); %>
       </select>
     </div>
-    <div class="form-group">
+    <button class="btn btn-primary" onclick="doCreateManual()" id="mc-btn" style="background:#0284c7;border-color:#0284c7;">Create</button>
+  </div>
+  <div id="mc-result" style="margin-top:10px;font-size:13px;"></div>
+</div>
+
+<%# ── Generator ─────────────────────────────────────────────────────────────── %>
+<div class="gen-panel">
+  <h3>⚡ Generate Keywords</h3>
+  <div class="gen-row">
+    <div class="fg">
       <label>Topic</label>
-      <input id="gen-topic" type="text" placeholder="e.g. keto diet" />
+      <input id="gen-topic" type="text" placeholder="e.g. keto diet for beginners" />
     </div>
-    <div class="form-group" style="max-width:90px;">
+    <div class="fg">
+      <label>Language</label>
+      <select id="gen-lang">
+        <option value="English" selected>English</option>
+        <option value="Vietnamese">Vietnamese</option>
+        <option value="Spanish">Spanish</option>
+        <option value="French">French</option>
+        <option value="German">German</option>
+        <option value="Indonesian">Indonesian</option>
+        <option value="Thai">Thai</option>
+        <option value="Portuguese">Portuguese</option>
+        <option value="Italian">Italian</option>
+        <option value="Japanese">Japanese</option>
+        <option value="Korean">Korean</option>
+        <option value="Chinese">Chinese</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>Tone</label>
+      <select id="gen-tone">
+        <option value="natural, humanize">Natural &amp; Human</option>
+        <option value="professional, informative">Professional</option>
+        <option value="friendly, conversational">Friendly</option>
+        <option value="authoritative, expert">Authoritative</option>
+        <option value="casual, engaging">Casual</option>
+        <option value="persuasive, sales">Persuasive</option>
+        <option value="educational, structured">Educational</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>Publish to Site <span style="color:#9ca3af;font-weight:400;">(optional)</span></label>
+      <select id="gen-site">
+        <option value="">— assign later —</option>
+        <% sites.forEach(function(s) { %>
+        <option value="<%= s.id %>"><%= s.domain %></option>
+        <% }); %>
+      </select>
+    </div>
+    <div class="fg-sm">
       <label>Count</label>
       <input id="gen-count" type="number" value="5" min="1" max="50" />
     </div>
-    <button class="btn btn-primary" onclick="generateKeywords()">Generate</button>
+    <button class="btn btn-primary" onclick="doGenerate()" id="gen-btn">Generate</button>
   </div>
-  <div id="gen-result"></div>
+  <div id="gen-cards"></div>
 </div>
 
 <%# ── Filters ──────────────────────────────────────────────────────────────── %>
@@ -81,6 +193,7 @@
         <th>Keyword</th>
         <th>Title</th>
         <th>Site</th>
+        <th>Lang</th>
         <th>Status</th>
         <th>Created</th>
         <th></th>
@@ -91,14 +204,20 @@
       <tr id="art-row-<%= a.id %>">
         <td class="muted">#<%= a.id %></td>
         <td><%= a.keyword %></td>
-        <td class="muted" style="max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+        <td class="muted" style="max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
           <%= a.title || '—' %>
         </td>
-        <td class="muted"><%= a.site_domain || '—' %></td>
+        <td class="muted" style="font-size:12px;"><%= a.site_domain || '—' %></td>
+        <td class="muted" style="font-size:12px;"><%= a.language || 'English' %></td>
         <td>
-          <span id="art-status-<%= a.id %>" class="tag status-<%= a.status %>"><%= a.status %></span>
+          <div>
+            <span id="art-status-<%= a.id %>" class="tag status-<%= a.status %>"><%= a.status %></span>
+            <div id="art-step-<%= a.id %>" style="font-size:11px;color:#6b7280;margin-top:2px;">
+              <%= a.build_step ? a.build_step : '' %>
+            </div>
+          </div>
         </td>
-        <td class="muted"><%= a.created_at %></td>
+        <td class="muted" style="font-size:12px;white-space:nowrap;"><%= new Date(a.created_at).toLocaleDateString() %></td>
         <td>
           <div style="display:flex;gap:6px;align-items:center;">
             <a class="btn btn-sm" href="/articles/<%= a.id %>">View</a>
@@ -111,7 +230,7 @@
               <button class="btn btn-sm" onclick="publishArticle(<%= a.id %>, this)">Publish</button>
             <% } %>
             <% if (a.wp_post_link) { %>
-              <a class="btn btn-sm" href="<%= a.wp_post_link %>" target="_blank" rel="noopener">View Post &rarr;</a>
+              <a class="btn btn-sm" href="<%= a.wp_post_link %>" target="_blank" rel="noopener">→ Post</a>
             <% } %>
           </div>
         </td>
@@ -120,7 +239,6 @@
     </tbody>
   </table>
 
-  <%# Pagination %>
   <% if (articles.length === limit || page > 1) { %>
   <div style="padding:12px 16px;display:flex;gap:8px;border-top:1px solid #e5e7eb;">
     <% if (page > 1) { %>
@@ -139,51 +257,66 @@
 (function () {
   var ACTIVE_POLLS = {};
 
-  function statusClass(s) {
-    return 'tag status-' + s;
+  /* ── Build step labels ───────────────────────────────────────────────────── */
+  var STEP_LABELS = {
+    'title':      '🖊 Writing title',
+    'research':   '🔍 Researching',
+    'outline':    '📋 Building outline',
+    'metadata':   '🏷 Generating metadata',
+    'images':     '🖼 Fetching images',
+    'stitching':  '🧵 Stitching content',
+    'failed':     '❌ Failed',
+  };
+  function stepLabel(step) {
+    if (!step) return '';
+    if (step.startsWith('sections:')) {
+      var parts = step.replace('sections:', '');
+      return '✍ Writing sections ' + parts;
+    }
+    return STEP_LABELS[step] || step;
   }
 
-  function pollStatus(id) {
+  /* ── Poll article status ─────────────────────────────────────────────────── */
+  function pollStatus(id, onDone) {
     if (ACTIVE_POLLS[id]) return;
     ACTIVE_POLLS[id] = setInterval(function () {
-      fetch('/articles/' + id + '/status')
+      fetch('/api/articles/' + id + '/status')
         .then(function (r) { return r.json(); })
         .then(function (data) {
           var a = data.article;
           if (!a) return;
           var badge = document.getElementById('art-status-' + id);
-          if (badge) { badge.className = statusClass(a.status); badge.textContent = a.status; }
+          var stepEl = document.getElementById('art-step-' + id);
+          if (badge) { badge.className = 'tag status-' + a.status; badge.textContent = a.status; }
+          if (stepEl) stepEl.textContent = stepLabel(a.build_step);
           if (a.status !== 'BUILDING' && a.status !== 'PUBLISHING') {
             clearInterval(ACTIVE_POLLS[id]);
             delete ACTIVE_POLLS[id];
-            // Reload row actions by refreshing page
+            if (onDone) onDone(a);
             if (a.status === 'DONE' || a.status === 'FAILED' || a.status === 'READY') {
-              setTimeout(function () { window.location.reload(); }, 1000);
+              setTimeout(function () { window.location.reload(); }, 1500);
             }
           }
-        })
-        .catch(function () {});
-    }, 3000);
+        }).catch(function () {});
+    }, 2500);
   }
 
   // Poll any in-flight articles on page load
   document.querySelectorAll('[id^="art-status-"]').forEach(function (el) {
     var s = el.textContent.trim();
     if (s === 'BUILDING' || s === 'PUBLISHING') {
-      var id = el.id.replace('art-status-', '');
-      pollStatus(parseInt(id, 10));
+      var id = parseInt(el.id.replace('art-status-', ''), 10);
+      pollStatus(id);
     }
   });
 
+  /* ── Build / Retry ───────────────────────────────────────────────────────── */
   window.buildArticle = function (id, btn) {
-    if (btn) { btn.disabled = true; btn.textContent = 'Starting…'; }
     var isRetry = btn && btn.textContent.indexOf('Retry') >= 0;
-    var url = '/articles/' + id + (isRetry ? '/retry' : '/build');
-    fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ publish_mode: 'immediate' })
-    })
+    if (btn) { btn.disabled = true; btn.textContent = isRetry ? 'Retrying…' : 'Starting…'; }
+    var url = '/api/articles/' + id + (isRetry ? '/retry' : '/build');
+    fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ publish_mode: 'immediate' }) })
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (data.error) {
@@ -202,12 +335,10 @@
       });
   };
 
+  /* ── Publish ─────────────────────────────────────────────────────────────── */
   window.publishArticle = function (id, btn) {
     if (btn) { btn.disabled = true; btn.textContent = 'Publishing…'; }
-    fetch('/articles/' + id + '/publish', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
-    })
+    fetch('/api/articles/' + id + '/publish', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (data.error) {
@@ -226,36 +357,211 @@
       });
   };
 
-  window.generateKeywords = function () {
-    var siteId = document.getElementById('gen-site').value;
+  /* ── Generator ───────────────────────────────────────────────────────────── */
+  window.doGenerate = function () {
     var topic  = document.getElementById('gen-topic').value.trim();
-    var count  = document.getElementById('gen-count').value;
-    var result = document.getElementById('gen-result');
+    var lang   = document.getElementById('gen-lang').value;
+    var tone   = document.getElementById('gen-tone').value;
+    var siteId = document.getElementById('gen-site').value;
+    var count  = parseInt(document.getElementById('gen-count').value, 10) || 5;
+    var cardsEl = document.getElementById('gen-cards');
+    var btn    = document.getElementById('gen-btn');
 
-    if (!siteId || !topic) {
-      result.innerHTML = '<span style="color:#dc2626;">Please select a site and enter a topic.</span>';
+    if (!topic) {
+      alert('Please enter a topic.');
       return;
     }
 
-    result.innerHTML = '<span style="color:#6b7280;">Generating keywords…</span>';
+    btn.disabled = true;
+    btn.textContent = 'Generating…';
+    cardsEl.innerHTML = '<div style="color:#6b7280;font-size:13px;padding:8px 0;">Calling Gemini for keywords…</div>';
 
-    fetch('/articles/keywords', {
+    fetch('/api/articles/keywords', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ site_id: siteId, topic: topic, count: count })
+      body: JSON.stringify({ topic: topic, count: count, language: lang, tone: tone, site_id: siteId || undefined })
     })
       .then(function (r) { return r.json(); })
       .then(function (data) {
+        btn.disabled = false;
+        btn.textContent = 'Generate';
         if (data.error) {
-          result.innerHTML = '<span style="color:#dc2626;">Error: ' + data.error + '</span>';
+          cardsEl.innerHTML = '<div style="color:#dc2626;font-size:13px;">' + data.error + '</div>';
           return;
         }
-        result.innerHTML = '<span style="color:#16a34a;">Created ' + data.created +
-          ' article(s). <a href="/articles?site_id=' + siteId + '">View them →</a></span>';
+
+        var articles = data.articles || [];
+        cardsEl.innerHTML = '';
+
+        articles.forEach(function (a) {
+          if (!a) return;
+          var card = document.createElement('div');
+          card.className = 'gen-card card-building';
+          card.id = 'gcard-' + a.id;
+          card.innerHTML =
+            '<div class="gen-card-kw">' + escHtml(a.keyword) + '</div>' +
+            '<div class="gen-card-step"><span class="spin"></span> <span class="gstep" id="gstep-' + a.id + '">Queued…</span></div>' +
+            '<div class="gen-card-actions" id="gact-' + a.id + '" style="display:none;"></div>';
+          cardsEl.appendChild(card);
+          startCardBuild(a.id);
+        });
+
+        if (!articles.length) {
+          cardsEl.innerHTML = '<div style="color:#6b7280;font-size:13px;">No keywords generated.</div>';
+        }
       })
       .catch(function (err) {
-        result.innerHTML = '<span style="color:#dc2626;">Request failed: ' + err.message + '</span>';
+        btn.disabled = false;
+        btn.textContent = 'Generate';
+        cardsEl.innerHTML = '<div style="color:#dc2626;font-size:13px;">Request failed: ' + err.message + '</div>';
       });
   };
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  var STEP_LABELS_CARD = {
+    'title':     '🖊 Writing title…',
+    'research':  '🔍 Researching…',
+    'outline':   '📋 Building outline…',
+    'metadata':  '🏷 Generating metadata…',
+    'images':    '🖼 Fetching & uploading images…',
+    'stitching': '🧵 Stitching HTML…',
+    'failed':    '❌ Failed',
+  };
+  function cardStepLabel(step) {
+    if (!step) return 'Processing…';
+    if (step.startsWith('sections:')) {
+      return '✍ Writing sections ' + step.replace('sections:', '') + '…';
+    }
+    return STEP_LABELS_CARD[step] || step;
+  }
+
+  function startCardBuild(id) {
+    // Trigger build
+    fetch('/api/articles/' + id + '/build', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ publish_mode: 'immediate' })
+    }).catch(function () {});
+
+    // Poll
+    var timer = setInterval(function () {
+      fetch('/api/articles/' + id + '/status')
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          var a = data.article;
+          if (!a) return;
+          var stepEl = document.getElementById('gstep-' + id);
+          var card   = document.getElementById('gcard-' + id);
+          var actEl  = document.getElementById('gact-' + id);
+
+          if (a.build_step && stepEl) stepEl.textContent = cardStepLabel(a.build_step);
+
+          if (a.status === 'DONE') {
+            clearInterval(timer);
+            if (card) { card.className = 'gen-card card-done'; }
+            if (stepEl) stepEl.textContent = '✅ Published!';
+            var spin = card && card.querySelector('.spin');
+            if (spin) spin.style.display = 'none';
+            if (actEl) {
+              actEl.style.display = '';
+              actEl.innerHTML = '<a class="btn btn-sm" href="/articles/' + id + '">View</a>' +
+                (a.wp_post_link ? ' <a class="btn btn-sm" href="' + escHtml(a.wp_post_link) + '" target="_blank" rel="noopener">→ Post</a>' : '');
+            }
+          } else if (a.status === 'READY') {
+            clearInterval(timer);
+            if (card) { card.className = 'gen-card card-done'; }
+            if (stepEl) stepEl.textContent = '✅ Ready — no site assigned';
+            var spin = card && card.querySelector('.spin');
+            if (spin) spin.style.display = 'none';
+            if (actEl) {
+              actEl.style.display = '';
+              actEl.innerHTML = '<a class="btn btn-sm btn-primary" href="/articles/' + id + '">View & Publish</a>';
+            }
+          } else if (a.status === 'FAILED') {
+            clearInterval(timer);
+            if (card) { card.className = 'gen-card card-failed'; }
+            if (stepEl) stepEl.textContent = '❌ ' + (a.error_message || 'Failed');
+            var spin = card && card.querySelector('.spin');
+            if (spin) spin.style.display = 'none';
+            if (actEl) {
+              actEl.style.display = '';
+              actEl.innerHTML = '<a class="btn btn-sm" href="/articles/' + id + '">View</a>';
+            }
+          } else if (a.status === 'BUILDING' || a.status === 'PUBLISHING') {
+            if (stepEl && !a.build_step) stepEl.textContent = a.status === 'PUBLISHING' ? '📤 Publishing…' : 'Building…';
+          }
+        }).catch(function () {});
+    }, 2500);
+  }
+  /* ── Manual create ──────────────────────────────────────────────────────── */
+  window.doCreateManual = function () {
+    var keyword = document.getElementById('mc-keyword').value.trim();
+    var title   = document.getElementById('mc-title').value.trim();
+    var lang    = document.getElementById('mc-lang').value;
+    var siteId  = document.getElementById('mc-site').value;
+    var btn     = document.getElementById('mc-btn');
+    var resEl   = document.getElementById('mc-result');
+
+    if (!keyword) {
+      resEl.textContent = 'Keyword is required.';
+      resEl.style.color = '#dc2626';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Creating…';
+    resEl.textContent = '';
+
+    fetch('/api/articles/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keyword: keyword, title: title || undefined, language: lang, site_id: siteId || undefined })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        btn.disabled = false;
+        btn.textContent = 'Create';
+        if (data.error) {
+          resEl.textContent = '✗ ' + data.error;
+          resEl.style.color = '#dc2626';
+          return;
+        }
+        var a = data.article;
+        resEl.innerHTML = '✓ Created <strong>' + escHtml(a.keyword) + '</strong> — ' +
+          '<a href="/articles/' + a.id + '">View article →</a>';
+        resEl.style.color = '#0284c7';
+        // Clear fields
+        document.getElementById('mc-keyword').value = '';
+        document.getElementById('mc-title').value = '';
+        // Add row to table without reload
+        var tbody = document.getElementById('articles-tbody');
+        if (tbody) {
+          var tr = document.createElement('tr');
+          tr.id = 'art-row-' + a.id;
+          tr.innerHTML =
+            '<td class="muted">#' + a.id + '</td>' +
+            '<td>' + escHtml(a.keyword) + '</td>' +
+            '<td class="muted" style="max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escHtml(a.title || '—') + '</td>' +
+            '<td class="muted" style="font-size:12px;">' + escHtml(a.site_domain || '—') + '</td>' +
+            '<td class="muted" style="font-size:12px;">' + escHtml(a.language || 'English') + '</td>' +
+            '<td><span id="art-status-' + a.id + '" class="tag status-PENDING">PENDING</span></td>' +
+            '<td class="muted" style="font-size:12px;white-space:nowrap;">' + new Date(a.created_at).toLocaleDateString() + '</td>' +
+            '<td><div style="display:flex;gap:6px;align-items:center;">' +
+              '<a class="btn btn-sm" href="/articles/' + a.id + '">View</a>' +
+              '<button class="btn btn-sm btn-primary" onclick="buildArticle(' + a.id + ', this)">Build</button>' +
+            '</div></td>';
+          tbody.insertBefore(tr, tbody.firstChild);
+        }
+      })
+      .catch(function (err) {
+        btn.disabled = false;
+        btn.textContent = 'Create';
+        resEl.textContent = 'Request failed: ' + err.message;
+        resEl.style.color = '#dc2626';
+      });
+  };
+
 }());
 </script>

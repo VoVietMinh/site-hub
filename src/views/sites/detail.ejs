@@ -170,6 +170,21 @@
         </div>
       </div>
     </form>
+
+    <%# Direct Connect toggle — for external/remote sites when WP_API_HOST proxy is set %>
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid #e5e7eb;">
+      <form method="post" action="/sites/<%= encodeURIComponent(domain) %>/credentials" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+          <input type="checkbox" name="direct_connect" value="1"
+            <%= local && local.direct_connect ? 'checked' : '' %>
+            onchange="this.form.submit()" />
+          <span><strong>Direct Connect</strong> — bypass WP_API_HOST proxy for this site</span>
+        </label>
+        <span class="muted" style="font-size:12px;">Enable this for external/remote WordPress sites when local EasyEngine sites use the proxy.</span>
+        <input type="hidden" name="wp_user" value="<%= (local && local.wp_user) || '' %>" />
+        <input type="hidden" name="_direct_only" value="1" />
+      </form>
+    </div>
   </div>
 </div>
 

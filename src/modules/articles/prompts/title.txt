@@ -1,1 +1,2 @@
 Hãy tạo một tiêu đề chuẩn SEO cho từ khóa {{KEYWORD}} . Tiêu đề phải có từ "{{KEYWORD}}", không được thay thế bằng từ khác. Độ dài tối đa 60 ký tự. Chỉ trả về một tiêu đề duy nhất, không có giải thích hay danh sách.
+Ngôn ngữ viết tiêu đề: {{LANGUAGE}}.

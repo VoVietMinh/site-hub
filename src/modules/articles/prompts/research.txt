@@ -12,3 +12,4 @@
     * Phân loại thông tin nếu có thể, để bài viết có cấu trúc rõ ràng.
 3.  **Kết luận:** Tóm tắt các điểm chính, đưa ra kết luận hoặc khuyến nghị (nếu có)."
 4. ** Tuyệt đối Chỉ xuất ra nội dung chính, không dẫn dắt ok đây là hay giải thích gì thêm
+Ngôn ngữ viết: {{LANGUAGE}}.

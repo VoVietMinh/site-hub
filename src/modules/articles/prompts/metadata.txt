@@ -1,6 +1,7 @@
 -Tạo thẻ mô tả (meta description) ngắn gọn (dưới 160 ký tự)
 - Tạo 3–5 thẻ tags phù hợp (tags viết không dấu, cách nhau bởi dấu phẩy) cho chủ đề  {{KEYWORD}}
 - Chọn một từ khóa chính cho bài viết (từ khóa phải xuất hiện trong tiêu đề  {{TITLE}} và đoạn đầu tiên : {{FIRST_PARAGRAPH}}
+Ngôn ngữ bài viết: {{LANGUAGE}}. Viết metaDescription và tags bằng ngôn ngữ {{LANGUAGE}}.
 Trả kết quả dưới dạng JSON như sau:
 {
   "mainKeyword": "...",
