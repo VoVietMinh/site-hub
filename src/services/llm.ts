@@ -14,12 +14,15 @@ export function stripFences(s: unknown): string {
     .trim();
 }
 
-export async function generate(prompt: string, opts: GenerateOptions = {}): Promise<unknown> {
+export async function generate(
+  prompt: string,
+  opts: GenerateOptions = {},
+): Promise<unknown> {
   const key = config.ai.apiKey;
   if (!key) throw new Error('AI_API_KEY not set -- cannot call Gemini.');
 
   const ai = new GoogleGenAI({ apiKey: key });
-  const model = config.ai.model || 'gemini-2.0-flash';
+  const model = config.ai.model || 'gemini-2.5-flash';
 
   const genConfig: Record<string, unknown> = {};
   if (opts.json) {
@@ -42,7 +45,9 @@ export async function generate(prompt: string, opts: GenerateOptions = {}): Prom
     } catch {
       const m = text.match(/\{[\s\S]*\}/);
       if (m) return JSON.parse(m[0]);
-      throw new Error('Gemini JSON mode returned non-parseable text: ' + text.slice(0, 300));
+      throw new Error(
+        'Gemini JSON mode returned non-parseable text: ' + text.slice(0, 300),
+      );
     }
   }
 
