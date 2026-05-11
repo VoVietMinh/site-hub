@@ -262,6 +262,12 @@
           </select>
           <div id="cat-loading" style="font-size:11px;color:#6b7280;margin-bottom:8px;display:none;">Loading categories&hellip;</div>
 
+          <label>Publish Type</label>
+          <select id="pub-type" style="margin-bottom:10px;">
+            <option value="publish">Publish</option>
+            <option value="draft">Save as Draft</option>
+          </select>
+
           <button class="btn btn-primary" style="width:100%;" onclick="doPublishToSite()" id="pub-submit-btn">&#x1F4E4; Publish Now</button>
           <div id="pub-submit-msg" style="font-size:12px;margin-top:6px;"></div>
         <% } %>
@@ -450,19 +456,21 @@
   window.doPublishToSite = function () {
     var pubSiteEl = document.getElementById('pub-site');
     var catEl     = document.getElementById('pub-cat');
+    var typeEl    = document.getElementById('pub-type');
     var msgEl     = document.getElementById('pub-submit-msg');
     var btn       = document.getElementById('pub-submit-btn');
     var siteId    = pubSiteEl ? pubSiteEl.value : '';
     var catId     = catEl ? catEl.value : '';
+    var wpStatus  = typeEl ? typeEl.value : 'publish';
 
     if (!siteId) {
       if (msgEl) { msgEl.textContent = 'Select a site first.'; msgEl.style.color = '#d97706'; }
       return;
     }
-    if (btn) { btn.disabled = true; btn.textContent = 'Publishing\u2026'; }
+    if (btn) { btn.disabled = true; btn.textContent = wpStatus === 'draft' ? 'Saving Draft\u2026' : 'Publishing\u2026'; }
     if (msgEl) msgEl.textContent = '';
 
-    var body = { site_id: siteId };
+    var body = { site_id: siteId, wp_status: wpStatus };
     if (catId) body.category_id = catId;
 
     fetch('/api/articles/' + articleId + '/publish', {
@@ -471,18 +479,18 @@
     })
       .then(function (r) { return r.json(); })
       .then(function (data) {
-        if (btn) { btn.disabled = false; btn.textContent = '\uD83D\uDCE4 Publish Now'; }
+        if (btn) { btn.disabled = false; btn.textContent = wpStatus === 'draft' ? 'Save as Draft' : '\uD83D\uDCE4 Publish Now'; }
         if (data.error) {
           if (msgEl) { msgEl.textContent = '\u2717 ' + data.error; msgEl.style.color = '#dc2626'; }
         } else {
-          if (msgEl) { msgEl.textContent = '\u2713 Published!'; msgEl.style.color = '#16a34a'; }
+          if (msgEl) { msgEl.textContent = wpStatus === 'draft' ? '\u2713 Saved as Draft!' : '\u2713 Published!'; msgEl.style.color = '#16a34a'; }
           setTimeout(refreshHistory, 600);
           var badge = document.getElementById('art-status-badge');
           if (badge) { badge.className = 'tag status-DONE'; badge.textContent = 'DONE'; }
         }
       })
       .catch(function (err) {
-        if (btn) { btn.disabled = false; btn.textContent = '\uD83D\uDCE4 Publish Now'; }
+        if (btn) { btn.disabled = false; btn.textContent = wpStatus === 'draft' ? 'Save as Draft' : '\uD83D\uDCE4 Publish Now'; }
         if (msgEl) { msgEl.textContent = 'Request failed: ' + err.message; msgEl.style.color = '#dc2626'; }
       });
   };

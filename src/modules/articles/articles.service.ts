@@ -355,6 +355,8 @@ export interface PublishOpts {
   siteId?:     number | null;
   /** Override category (defaults to article.category_id) */
   categoryId?: number | null;
+  /** WP post status: 'publish' | 'draft' | 'pending' | 'private' (overrides site default) */
+  wpStatus?:   string;
 }
 
 export async function publishArticle(articleId: number, opts: PublishOpts = {}): Promise<void> {
@@ -408,7 +410,10 @@ export async function publishArticle(articleId: number, opts: PublishOpts = {}):
     payload = {
       title:   article.title ?? article.keyword,
       content: article.content_html ?? '',
-      status:  isScheduled ? 'future' : ((site.default_status as string | undefined) ?? 'publish'),
+      status:  isScheduled ? 'future'
+               : (['publish','draft','pending','private'].includes(opts.wpStatus ?? '')
+                   ? opts.wpStatus!
+                   : ((site.default_status as string | undefined) ?? 'publish')),
     };
     if (isScheduled) payload['date_gmt'] = new Date(article.scheduled_at as string).toISOString().replace(/\.\d{3}Z$/, '');
     if (tagIds.length)          payload['tags']       = tagIds;
