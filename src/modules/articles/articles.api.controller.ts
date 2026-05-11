@@ -66,10 +66,9 @@ export const retry = asyncHandler(async (req: Request, res: Response) => {
 export const publish = asyncHandler(async (req: Request, res: Response) => {
   const id   = parseInt(req.params['id']!, 10);
   const body = req.body as Record<string, unknown>;
-  const opts: { siteId?: number | null; categoryId?: number | null; wpStatus?: string } = {};
+  const opts: { siteId?: number | null; categoryId?: number | null } = {};
   if (body['site_id']     != null) opts.siteId     = parseInt(String(body['site_id']),     10) || null;
   if (body['category_id'] != null) opts.categoryId = parseInt(String(body['category_id']), 10) || null;
-  if (body['wp_status']   != null) opts.wpStatus   = String(body['wp_status']);
   try {
     await service.publishArticle(id, opts);
     res.json({ ok: true });
